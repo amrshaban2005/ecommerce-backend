@@ -1,0 +1,220 @@
+openapi: 3.1.1
+info:
+  title: E-commerce API
+  version: 0.1.0
+  description: Shared public REST contract exposed through the API gateway. Endpoints are added as their stories are implemented.
+servers:
+  - url: http://localhost:8080
+    description: Local API gateway
+tags:
+  - name: Auth
+    description: Registration and authentication
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      operationId: registerCustomer
+      summary: Register a customer
+      description: >-
+        US-001. Public registration always assigns Customer. Full name is trimmed;
+        email is trimmed and lowercased before validation and storage. Password is
+        not modified and requires at least eight characters, with no composition
+        requirements. The password is stored only as a salted Argon2id hash.
+        This operation does not issue an access token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterCustomerRequest'
+            example:
+              full_name: Amr Ahmed
+              email: amr@example.com
+              password: examplepassword
+      responses:
+        '201':
+          description: Customer account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterCustomerResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/EmailAlreadyRegistered'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      operationId: signInCustomer
+      summary: Sign in and obtain an access token
+      description: >-
+        US-002 and US-003. Email is trimmed and lowercased; password is unchanged.
+        Successful authentication returns an HS256 JWT valid for 30 minutes.
+        Unknown email and incorrect password return the same invalid-credentials response.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInRequest'
+            example:
+              email: amr@example.com
+              password: examplepassword
+      responses:
+        '200':
+          description: Authenticated; access token issued
+          headers:
+            Cache-Control:
+              schema: {type: string, const: no-store}
+            Pragma:
+              schema: {type: string, const: no-cache}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignInResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  responses:
+    ValidationError:
+      description: VALIDATION_ERROR. Invalid JSON, unknown fields or invalid input. Field errors identify the invalid field.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    EmailAlreadyRegistered:
+      description: EMAIL_ALREADY_REGISTERED. An account with this normalized email already exists.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InvalidCredentials:
+      description: INVALID_CREDENTIALS. Invalid email or password. Does not reveal which credential was incorrect.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: INTERNAL_ERROR. The operation failed without exposing internal details.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    SignInRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          description: A valid plain email address; trimmed and lowercased before lookup.
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 1
+          description: Required; verified as supplied, without trimming or modification.
+    AccessToken:
+      type: object
+      additionalProperties: false
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token:
+          type: string
+          description: Signed JWT containing sub, role, iss, aud, iat and exp.
+        token_type:
+          type: string
+          const: Bearer
+        expires_in:
+          type: integer
+          const: 1800
+          description: Token lifetime in seconds.
+    SignInResponse:
+      type: object
+      additionalProperties: false
+      required: [data, errors]
+      properties:
+        data:
+          $ref: '#/components/schemas/AccessToken'
+        errors:
+          type: array
+          maxItems: 0
+          items:
+            $ref: '#/components/schemas/ApiError'
+    RegisterCustomerRequest:
+      type: object
+      additionalProperties: false
+      required: [full_name, email, password]
+      properties:
+        full_name:
+          type: string
+          minLength: 1
+          description: Required; cannot be blank after trimming surrounding whitespace.
+        email:
+          type: string
+          description: A plain email address; trimmed, lowercased and validated. Display-name address forms are rejected.
+          examples: [amr@example.com]
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          minLength: 8
+          description: At least eight Unicode characters. No uppercase, lowercase, digit or symbol requirements. Never trimmed or modified.
+    Customer:
+      type: object
+      additionalProperties: false
+      required: [user_id, full_name, email, role]
+      properties:
+        user_id:
+          type: string
+          format: uuid
+          description: UUID v7 generated by the service.
+        full_name: {type: string}
+        email: {type: string, format: email}
+        role:
+          type: string
+          enum: [Customer]
+    RegisterCustomerResponse:
+      type: object
+      additionalProperties: false
+      required: [data, errors]
+      properties:
+        data:
+          $ref: '#/components/schemas/Customer'
+        errors:
+          type: array
+          maxItems: 0
+          items:
+            $ref: '#/components/schemas/ApiError'
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [error_code, message]
+      properties:
+        error_code: {type: string}
+        message: {type: string}
+        field:
+          type: string
+          description: Included when the error identifies a specific input field.
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [data, errors]
+      properties:
+        data: {type: 'null'}
+        errors:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ApiError'

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	grpcadapter "ecommerce.local/api-gateway/internal/adapter/grpc"
 	"ecommerce.local/api-gateway/internal/config"
 	"ecommerce.local/api-gateway/internal/health"
 	"ecommerce.local/api-gateway/internal/metrics"
@@ -25,6 +26,7 @@ type Application struct {
 	HTTPServer  *http.Server
 	Health      *health.Handler
 	RedisClient *redis.Client
+	AuthClient  *grpcadapter.Client
 }
 
 func New(cfg *config.Config) (*Application, error) {
@@ -40,12 +42,18 @@ func New(cfg *config.Config) (*Application, error) {
 		_ = rdb.Close()
 		return nil, fmt.Errorf("proxy routes: %w", err)
 	}
+	auth, err := grpcadapter.NewAuthClient(cfg.AuthGRPCAddress, time.Duration(cfg.AuthVerifyTimeoutSeconds)*time.Second)
+	if err != nil {
+		_ = rdb.Close()
+		return nil, err
+	}
 	hh := health.New()
 	router := mux.NewRouter()
 	router.Use(handlers.ProxyHeaders)
 	router.Use(middleware.CorrelationIDMiddleware)
 	router.Use(middleware.RequestLogger)
 	router.Use(handlers.RecoveryHandler())
+	router.Use(middleware.Auth(auth))
 	router.HandleFunc("/health/liveness", hh.Liveness).Methods(http.MethodGet)
 	router.HandleFunc("/health/readiness", hh.Readiness).Methods(http.MethodGet)
 	router.Handle("/metrics", metrics.Handler())
@@ -56,7 +64,7 @@ func New(cfg *config.Config) (*Application, error) {
 		Handler:           router,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	return &Application{Config: cfg, HTTPServer: httpSrv, Health: hh, RedisClient: rdb}, nil
+	return &Application{Config: cfg, HTTPServer: httpSrv, Health: hh, RedisClient: rdb, AuthClient: auth}, nil
 }
 
 func (a *Application) Run(errCh chan<- error) {
@@ -78,6 +86,11 @@ func (a *Application) Shutdown(ctx context.Context) error {
 	if a.RedisClient != nil {
 		if err := a.RedisClient.Close(); err != nil {
 			return fmt.Errorf("redis close error: %w", err)
+		}
+	}
+	if a.AuthClient != nil {
+		if err := a.AuthClient.Close(); err != nil {
+			return fmt.Errorf("Auth grpc close error: %w", err)
 		}
 	}
 	return nil

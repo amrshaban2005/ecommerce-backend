@@ -11,18 +11,20 @@ import (
 )
 
 type Config struct {
-	HTTPPort               int
-	RedisHost              string
-	RedisPort              int
-	RateLimitPerIP         int
-	MaxRequestBodyBytes    int64
-	UpstreamTimeoutSeconds int
-	AuthHTTPAddress        string
-	ProductHTTPAddress     string
-	CartHTTPAddress        string
-	InventoryHTTPAddress   string
-	OrderHTTPAddress       string
-	PaymentHTTPAddress     string
+	HTTPPort                 int
+	RedisHost                string
+	RedisPort                int
+	RateLimitPerIP           int
+	MaxRequestBodyBytes      int64
+	UpstreamTimeoutSeconds   int
+	AuthHTTPAddress          string
+	AuthGRPCAddress          string
+	AuthVerifyTimeoutSeconds int
+	ProductHTTPAddress       string
+	CartHTTPAddress          string
+	InventoryHTTPAddress     string
+	OrderHTTPAddress         string
+	PaymentHTTPAddress       string
 }
 
 func Load() (*Config, error) {
@@ -62,23 +64,32 @@ func Load() (*Config, error) {
 		errs = append(errs, fmt.Errorf("UPSTREAM_TIMEOUT_SECONDS must be positive and fit a time.Duration"))
 	}
 
+	authVerifyTimeoutSeconds, err := getIntDefault("AUTH_VERIFY_TIMEOUT_SECONDS", 1)
+	if err != nil {
+		errs = append(errs, err)
+	} else if authVerifyTimeoutSeconds <= 0 || int64(authVerifyTimeoutSeconds) > int64((1<<63-1)/time.Second) {
+		errs = append(errs, fmt.Errorf("AUTH_VERIFY_TIMEOUT_SECONDS must be positive and fit a time.Duration"))
+	}
+
 	if len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
 
 	return &Config{
-		HTTPPort:               httpPort,
-		RedisHost:              envStr("REDIS_HOST", "localhost"),
-		RedisPort:              redisPort,
-		RateLimitPerIP:         rateLimitPerIP,
-		MaxRequestBodyBytes:    maxRequestBodyBytes,
-		UpstreamTimeoutSeconds: upstreamTimeoutSeconds,
-		AuthHTTPAddress:        envStr("AUTH_HTTP_ADDRESS", "http://localhost:8081"),
-		ProductHTTPAddress:     envStr("PRODUCT_HTTP_ADDRESS", "http://localhost:8082"),
-		CartHTTPAddress:        envStr("CART_HTTP_ADDRESS", "http://localhost:8083"),
-		InventoryHTTPAddress:   envStr("INVENTORY_HTTP_ADDRESS", "http://localhost:8084"),
-		OrderHTTPAddress:       envStr("ORDER_HTTP_ADDRESS", "http://localhost:8085"),
-		PaymentHTTPAddress:     envStr("PAYMENT_HTTP_ADDRESS", "http://localhost:8086"),
+		HTTPPort:                 httpPort,
+		RedisHost:                envStr("REDIS_HOST", "localhost"),
+		RedisPort:                redisPort,
+		RateLimitPerIP:           rateLimitPerIP,
+		MaxRequestBodyBytes:      maxRequestBodyBytes,
+		UpstreamTimeoutSeconds:   upstreamTimeoutSeconds,
+		AuthHTTPAddress:          envStr("AUTH_HTTP_ADDRESS", "http://localhost:8081"),
+		AuthGRPCAddress:          envStr("AUTH_GRPC_ADDRESS", "localhost:9090"),
+		AuthVerifyTimeoutSeconds: authVerifyTimeoutSeconds,
+		ProductHTTPAddress:       envStr("PRODUCT_HTTP_ADDRESS", "http://localhost:8082"),
+		CartHTTPAddress:          envStr("CART_HTTP_ADDRESS", "http://localhost:8083"),
+		InventoryHTTPAddress:     envStr("INVENTORY_HTTP_ADDRESS", "http://localhost:8084"),
+		OrderHTTPAddress:         envStr("ORDER_HTTP_ADDRESS", "http://localhost:8085"),
+		PaymentHTTPAddress:       envStr("PAYMENT_HTTP_ADDRESS", "http://localhost:8086"),
 	}, nil
 }
 

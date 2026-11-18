@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "ecommerce.local/contracts/auth/v1;authv1";
+
+// Internal Auth API; never expose this service through public ingress.
+service AuthService {
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+}
+
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  // Invalid tokens return false with empty user_id and role.
+  bool valid = 1;
+  string user_id = 2;
+  string role = 3;
+}
