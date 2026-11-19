@@ -3,6 +3,8 @@ go 1.26.3
 use (
 	./api-gateway
 	./auth-service
+	./cart-service
 	./contracts
+	./product-service
 	./templates/go-service
 )

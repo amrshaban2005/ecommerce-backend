@@ -1,15 +1,21 @@
 .PHONY: test build vet
 
 test:
+	$(MAKE) -C cart-service test
+	$(MAKE) -C product-service test
 	$(MAKE) -C auth-service test
 	$(MAKE) -C api-gateway test
 	$(MAKE) -C templates/go-service test
 build:
+	$(MAKE) -C cart-service build
+	$(MAKE) -C product-service build
 	cd contracts && GOWORK=off go build ./...
 	$(MAKE) -C auth-service build
 	$(MAKE) -C api-gateway build
 	$(MAKE) -C templates/go-service build
 vet:
+	$(MAKE) -C cart-service vet
+	$(MAKE) -C product-service vet
 	cd contracts && GOWORK=off go vet ./...
 	$(MAKE) -C auth-service vet
 	$(MAKE) -C api-gateway vet

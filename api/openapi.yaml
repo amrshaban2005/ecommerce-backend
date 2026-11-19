@@ -9,6 +9,10 @@ servers:
 tags:
   - name: Auth
     description: Registration and authentication
+  - name: Product
+    description: Product catalog and administration
+  - name: Cart
+    description: Saved customer cart
 paths:
   /api/v1/auth/register:
     post:
@@ -84,8 +88,168 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/v1/products:
+    get:
+      tags: [Product]
+      operationId: browseProducts
+      summary: Browse active products
+      description: >-
+        US-006. Lists active products without requiring authentication. Inactive
+        products are excluded. Stock does not filter this listing, so active
+        out-of-stock products remain visible. Prices are USD decimal strings.
+      security: []
+      responses:
+        '200':
+          description: Active products; data is an empty array when the catalog has no active products.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BrowseProductsResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/admin/products:
+    post:
+      tags: [Product]
+      operationId: createProduct
+      summary: Create a product
+      description: >-
+        US-021. Requires Administrator role. Creates an active product using an
+        existing category. Name, description, category ID, price and image URL
+        are trimmed. USD price must be a positive decimal string. Stock and
+        inventory initialization are outside this operation.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+            example:
+              name: Office Laptop
+              description: Laptop for everyday office work
+              category_id: 019a6000-0000-7000-8000-000000000001
+              price_usd: '799.99'
+      responses:
+        '201':
+          description: Active product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateProductResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/cart:
+    get:
+      tags: [Cart]
+      operationId: viewSavedCart
+      summary: View the authenticated customer's saved cart
+      description: >-
+        US-011. Requires Customer role. Returns only the authenticated customer's
+        persisted product IDs and quantities, ordered by product ID. An absent
+        or empty cart returns an empty items array. Product prices and totals
+        are deferred.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Saved cart items, or an empty items array
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ViewSavedCartResponse'
+              example:
+                data:
+                  items: []
+                errors: []
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: FORBIDDEN. Customer permission is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/cart/items:
+    post:
+      tags: [Cart]
+      operationId: addCartItem
+      summary: Add a product to the saved cart
+      description: >-
+        US-010. Requires Customer role. Saves a product and positive integer
+        quantity in the authenticated customer's cart. Adding the same product
+        increments the existing line. Product existence and active status checks
+        are deferred; inventory is neither reserved nor deducted. Repeating a
+        successful request increments again.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCartItemRequest'
+            example:
+              product_id: 019a6000-0000-7000-8000-000000000001
+              quantity: 2
+      responses:
+        '200':
+          description: Cart line saved with the resulting quantity
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddCartItemResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: FORBIDDEN. Customer permission is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: QUANTITY_LIMIT_EXCEEDED. Resulting quantity exceeds 2147483647; the cart is unchanged.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   responses:
+    Unauthorized:
+      description: UNAUTHORIZED. Authentication is missing, invalid or expired.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: FORBIDDEN. Administrator permission is required.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     ValidationError:
       description: VALIDATION_ERROR. Invalid JSON, unknown fields or invalid input. Field errors identify the invalid field.
       content:
@@ -111,6 +275,143 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    ViewSavedCartResponse:
+      type: object
+      additionalProperties: false
+      required: [data, errors]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/SavedCartItem'
+        errors:
+          type: array
+          maxItems: 0
+          items:
+            $ref: '#/components/schemas/ApiError'
+    SavedCartItem:
+      type: object
+      additionalProperties: false
+      required: [product_id, quantity]
+      properties:
+        product_id: {type: string, format: uuid}
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+    AddCartItemRequest:
+      type: object
+      additionalProperties: false
+      required: [product_id, quantity]
+      properties:
+        product_id:
+          type: string
+          format: uuid
+          description: A non-zero product UUID; existence and active status are not checked yet.
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+    AddCartItemResponse:
+      type: object
+      additionalProperties: false
+      required: [data, errors]
+      properties:
+        data:
+          $ref: '#/components/schemas/CartItem'
+        errors:
+          type: array
+          maxItems: 0
+          items:
+            $ref: '#/components/schemas/ApiError'
+    CartItem:
+      type: object
+      additionalProperties: false
+      required: [cart_id, product_id, quantity]
+      properties:
+        cart_id: {type: string, format: uuid}
+        product_id: {type: string, format: uuid}
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+    CreateProductRequest:
+      type: object
+      additionalProperties: false
+      required: [name, description, category_id, price_usd]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Required; cannot be blank after trimming.
+        description:
+          type: string
+          minLength: 1
+          description: Required; cannot be blank after trimming.
+        category_id:
+          type: string
+          format: uuid
+          description: Must reference an existing category.
+        price_usd:
+          type: string
+          pattern: '^[0-9]+(\.[0-9]+)?$'
+          description: Positive USD decimal amount; zero and negative values are rejected. Trimmed before validation.
+          examples: ['799.99']
+        image_url:
+          type: string
+          description: Optional product image URL.
+    CreateProductResponse:
+      type: object
+      additionalProperties: false
+      required: [data, errors]
+      properties:
+        data:
+          $ref: '#/components/schemas/Product'
+        errors:
+          type: array
+          maxItems: 0
+          items:
+            $ref: '#/components/schemas/ApiError'
+    Product:
+      type: object
+      additionalProperties: false
+      required: [product_id, name, description, category_id, category_name, price_usd]
+      properties:
+        product_id: {type: string, format: uuid}
+        name: {type: string}
+        description: {type: string}
+        category_id: {type: string, format: uuid}
+        category_name: {type: string}
+        price_usd:
+          type: string
+          pattern: '^[0-9]+(\.[0-9]+)?$'
+          description: Exact USD decimal amount; represented as a string to preserve precision.
+          examples: ['19.99']
+        image_url:
+          type: string
+          description: Optional product image URL; omitted when not set.
+    BrowseProductsResponse:
+      type: object
+      additionalProperties: false
+      required: [data, errors]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        errors:
+          type: array
+          maxItems: 0
+          items:
+            $ref: '#/components/schemas/ApiError'
     SignInRequest:
       type: object
       additionalProperties: false
