@@ -1,0 +1,20 @@
+syntax = "proto3";
+package product.v1;
+option go_package = "ecommerce.local/contracts/product/v1;productv1";
+
+// Internal authoritative lookup, bypassing public catalog cache/filtering.
+service ProductService {
+ rpc GetCheckoutProducts(GetCheckoutProductsRequest) returns (GetCheckoutProductsResponse);
+}
+message GetCheckoutProductsRequest { repeated string product_ids = 1; }
+message CheckoutProduct {
+ string product_id = 1;
+ string name = 2;
+ bool active = 3;
+ // Exact USD decimal from PostgreSQL NUMERIC; never floating point.
+ string price_usd = 4;
+}
+message GetCheckoutProductsResponse {
+ // Missing IDs are omitted. Callers must reject checkout if any requested ID is missing.
+ repeated CheckoutProduct products = 1;
+}

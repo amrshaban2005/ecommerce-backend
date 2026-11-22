@@ -1,0 +1,36 @@
+syntax = "proto3";
+package inventory.v1;
+option go_package = "ecommerce.local/contracts/inventory/v1;inventoryv1";
+import "google/protobuf/timestamp.proto";
+
+// Internal API owned by Inventory. Order coordinates checkout and compensation.
+service InventoryService {
+ rpc ReserveStock(ReserveStockRequest) returns (Reservation);
+ rpc GetReservation(GetReservationRequest) returns (Reservation);
+ // For definitively failed checkout only. Payment-aware release is a later stage.
+ // If the order has no reservation, persist a RELEASED cancellation record so
+ // a late ReserveStock cannot create a new hold. Repeating release is safe.
+ rpc ReleaseReservation(ReleaseReservationRequest) returns (Reservation);
+}
+message ReservationItem {
+ string product_id = 1;
+ int32 quantity = 2;
+}
+message ReserveStockRequest {
+ string order_id = 1;
+ repeated ReservationItem items = 2;
+}
+message GetReservationRequest { string order_id = 1; }
+message ReleaseReservationRequest { string order_id = 1; }
+enum ReservationStatus {
+ RESERVATION_STATUS_UNSPECIFIED = 0;
+ RESERVATION_STATUS_ACTIVE = 1;
+ RESERVATION_STATUS_RELEASED = 2;
+}
+message Reservation {
+ string reservation_id = 1;
+ string order_id = 2;
+ ReservationStatus status = 3;
+ google.protobuf.Timestamp expires_at = 4;
+ repeated ReservationItem items = 5;
+}

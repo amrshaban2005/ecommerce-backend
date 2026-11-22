@@ -52,11 +52,34 @@ case "${1:-}" in
             POSTGRES_DSN="${POSTGRES_DSN:-postgres://cart:cart_local_only@127.0.0.1:5432/cart_db?sslmode=disable}" \
             go run ./cmd/cart-service
         ;;
+    inventory-service)
+        cd "$SERVICE_ROOT/inventory-service"
+        exec env \
+            HTTP_PORT="${HTTP_PORT:-8084}" \
+            GRPC_PORT="${GRPC_PORT:-9093}" \
+            POSTGRES_DSN="${POSTGRES_DSN:-postgres://inventory:inventory_local_only@127.0.0.1:5432/inventory_db?sslmode=disable}" \
+            go run ./cmd/inventory-service
+        ;;
+    order-service)
+        cd "$SERVICE_ROOT/order-service"
+        exec env \
+            HTTP_PORT="${HTTP_PORT:-8085}" \
+            GRPC_PORT="${GRPC_PORT:-9094}" \
+            POSTGRES_DSN="${POSTGRES_DSN:-postgres://order:order_local_only@127.0.0.1:5432/order_db?sslmode=disable}" \
+            CART_GRPC_ADDRESS="${CART_GRPC_ADDRESS:-127.0.0.1:9092}" \
+            PRODUCT_GRPC_ADDRESS="${PRODUCT_GRPC_ADDRESS:-127.0.0.1:9091}" \
+            INVENTORY_GRPC_ADDRESS="${INVENTORY_GRPC_ADDRESS:-127.0.0.1:9093}" \
+            RPC_TIMEOUT_SECONDS="${RPC_TIMEOUT_SECONDS:-5}" \
+            CHECKOUT_TIMEOUT_SECONDS="${CHECKOUT_TIMEOUT_SECONDS:-20}" \
+            RECOVERY_INTERVAL_SECONDS="${RECOVERY_INTERVAL_SECONDS:-5}" \
+            RECOVERY_BATCH_SIZE="${RECOVERY_BATCH_SIZE:-10}" \
+            go run ./cmd/order-service
+        ;;
     -h|--help)
-        echo "Usage: $0 {api-gateway|auth-service|product-service|cart-service}"
+        echo "Usage: $0 {api-gateway|auth-service|product-service|cart-service|inventory-service|order-service}"
         ;;
     *)
-        echo "Usage: $0 {api-gateway|auth-service|product-service|cart-service}" >&2
+        echo "Usage: $0 {api-gateway|auth-service|product-service|cart-service|inventory-service|order-service}" >&2
         exit 1
         ;;
 esac

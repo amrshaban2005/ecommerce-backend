@@ -10,12 +10,14 @@ import (
 	"net/http"
 	"time"
 
+	grpcadapter "ecommerce.local/cart-service/internal/adapter/grpc"
 	httpadapter "ecommerce.local/cart-service/internal/adapter/http"
 	"ecommerce.local/cart-service/internal/adapter/repository"
 	"ecommerce.local/cart-service/internal/application"
 	"ecommerce.local/cart-service/internal/config"
 	"ecommerce.local/cart-service/internal/dbmigrate"
 	"ecommerce.local/cart-service/internal/health"
+	cartv1 "ecommerce.local/contracts/cart/v1"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -56,6 +58,7 @@ func New(cfg *config.Config) (*Application, error) {
 	hh := health.New()
 
 	grpcSrv := grpc.NewServer()
+	cartv1.RegisterCartServiceServer(grpcSrv, grpcadapter.NewCartServer(cart))
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPCPort))
 	if err != nil {

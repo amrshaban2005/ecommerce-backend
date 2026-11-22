@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"time"
 
+	productv1 "ecommerce.local/contracts/product/v1"
+	grpcadapter "ecommerce.local/product-service/internal/adapter/grpc"
 	httpadapter "ecommerce.local/product-service/internal/adapter/http"
 	"ecommerce.local/product-service/internal/adapter/repository"
 	"ecommerce.local/product-service/internal/application"
@@ -56,6 +58,7 @@ func New(cfg *config.Config) (*Application, error) {
 	hh := health.New()
 
 	grpcSrv := grpc.NewServer()
+	productv1.RegisterProductServiceServer(grpcSrv, grpcadapter.NewProductServer(catalog))
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPCPort))
 	if err != nil {

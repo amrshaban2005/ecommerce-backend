@@ -1,0 +1,14 @@
+syntax = "proto3";
+package cart.v1;
+option go_package = "ecommerce.local/contracts/cart/v1;cartv1";
+
+// Internal checkout API. Only trusted services may supply customer identity.
+service CartService {
+ rpc GetCustomerCart(GetCustomerCartRequest) returns (GetCustomerCartResponse);
+}
+message GetCustomerCartRequest { string customer_id = 1; }
+message CartItem {
+ string product_id = 1;
+ int32 quantity = 2;
+}
+message GetCustomerCartResponse { repeated CartItem items = 1; }

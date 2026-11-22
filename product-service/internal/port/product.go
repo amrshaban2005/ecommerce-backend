@@ -14,11 +14,13 @@ type CreateProductCommand struct {
 }
 
 type ProductCatalog interface {
+	GetCheckoutProducts(context.Context, []string) ([]domain.Product, error)
 	Browse(context.Context) ([]domain.Product, error)
 	Create(context.Context, CreateProductCommand) (domain.Product, error)
 }
 
 type ProductRepository interface {
+	FindByIDs(context.Context, []string) ([]domain.Product, error)
 	ListActive(context.Context) ([]domain.Product, error)
 	Create(context.Context, domain.Product) (domain.Product, error)
 }

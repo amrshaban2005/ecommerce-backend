@@ -3,6 +3,7 @@ module ecommerce.local/cart-service
 go 1.26.3
 
 require (
+	ecommerce.local/contracts v0.0.0
 	github.com/google/uuid v1.6.0
 	github.com/golang-migrate/migrate/v4 v4.18.2
 	github.com/gorilla/handlers v1.5.2
@@ -35,3 +36,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
+
+replace ecommerce.local/contracts => ../contracts

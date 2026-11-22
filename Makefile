@@ -7,6 +7,8 @@ test:
 	$(MAKE) -C api-gateway test
 	$(MAKE) -C templates/go-service test
 build:
+	$(MAKE) -C order-service build
+	$(MAKE) -C inventory-service build
 	$(MAKE) -C cart-service build
 	$(MAKE) -C product-service build
 	cd contracts && GOWORK=off go build ./...
@@ -14,6 +16,8 @@ build:
 	$(MAKE) -C api-gateway build
 	$(MAKE) -C templates/go-service build
 vet:
+	$(MAKE) -C order-service vet
+	$(MAKE) -C inventory-service vet
 	$(MAKE) -C cart-service vet
 	$(MAKE) -C product-service vet
 	cd contracts && GOWORK=off go vet ./...
@@ -43,4 +47,4 @@ down: infra-down
 .PHONY: proto
 
 proto:
-	protoc -I contracts/proto --go_out=contracts --go_opt=paths=source_relative --go-grpc_out=contracts --go-grpc_opt=paths=source_relative contracts/proto/auth/v1/auth.proto
+	protoc -I contracts/proto --go_out=contracts --go_opt=paths=source_relative --go-grpc_out=contracts --go-grpc_opt=paths=source_relative $(wildcard contracts/proto/*/v1/*.proto)

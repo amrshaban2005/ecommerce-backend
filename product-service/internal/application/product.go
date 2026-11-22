@@ -32,3 +32,11 @@ func (s *ProductService) Create(ctx context.Context, cmd port.CreateProductComma
 	product.Active = true
 	return s.products.Create(ctx, product)
 }
+
+func (s *ProductService) GetCheckoutProducts(ctx context.Context, ids []string) ([]domain.Product, error) {
+	ids, err := domain.NormalizeProductIDs(ids)
+	if err != nil {
+		return nil, err
+	}
+	return s.products.FindByIDs(ctx, ids)
+}

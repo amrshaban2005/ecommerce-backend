@@ -22,8 +22,8 @@ services:
 
   product-service:
     build:
-      context: ../product-service
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: product-service/Dockerfile
     environment:
       HTTP_PORT: "8082"
       GRPC_PORT: "9091"
@@ -40,8 +40,8 @@ services:
 
   cart-service:
     build:
-      context: ../cart-service
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: cart-service/Dockerfile
     environment:
       HTTP_PORT: "8083"
       GRPC_PORT: "9092"
@@ -50,6 +50,56 @@ services:
       - backend
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8083/health/readiness"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    stop_grace_period: 20s
+
+  inventory-service:
+    build:
+      context: ..
+      dockerfile: inventory-service/Dockerfile
+    environment:
+      HTTP_PORT: "8084"
+      GRPC_PORT: "9093"
+      POSTGRES_DSN: postgres://inventory:inventory_local_only@postgres:5432/inventory_db?sslmode=disable
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8084/health/readiness"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    stop_grace_period: 20s
+
+  order-service:
+    build:
+      context: ..
+      dockerfile: order-service/Dockerfile
+    environment:
+      HTTP_PORT: "8085"
+      GRPC_PORT: "9094"
+      POSTGRES_DSN: postgres://order:order_local_only@postgres:5432/order_db?sslmode=disable
+      CART_GRPC_ADDRESS: cart-service:9092
+      PRODUCT_GRPC_ADDRESS: product-service:9091
+      INVENTORY_GRPC_ADDRESS: inventory-service:9093
+      RPC_TIMEOUT_SECONDS: "5"
+      CHECKOUT_TIMEOUT_SECONDS: "20"
+      RECOVERY_INTERVAL_SECONDS: "5"
+      RECOVERY_BATCH_SIZE: "10"
+    depends_on:
+      cart-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8085/health/readiness"]
       interval: 3s
       timeout: 3s
       retries: 10
@@ -67,6 +117,8 @@ services:
       AUTH_HTTP_ADDRESS: http://auth-service:8080
       PRODUCT_HTTP_ADDRESS: http://product-service:8082
       CART_HTTP_ADDRESS: http://cart-service:8083
+      INVENTORY_HTTP_ADDRESS: http://inventory-service:8084
+      ORDER_HTTP_ADDRESS: http://order-service:8085
       AUTH_GRPC_ADDRESS: auth-service:9090
     ports:
       - "127.0.0.1:8080:8080"
@@ -78,6 +130,8 @@ services:
       product-service:
         condition: service_healthy
       cart-service:
+        condition: service_healthy
+      order-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health/readiness"]

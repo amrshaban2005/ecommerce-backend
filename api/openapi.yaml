@@ -13,6 +13,8 @@ tags:
     description: Product catalog and administration
   - name: Cart
     description: Saved customer cart
+  - name: Checkout
+    description: Checkout and order creation
 paths:
   /api/v1/auth/register:
     post:
@@ -147,6 +149,95 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/v1/checkout:
+    post:
+      tags: [Checkout]
+      operationId: startCheckout
+      summary: Start checkout and create an order awaiting payment
+      description: >-
+        US-014, US-015 and US-016. Requires Customer role. Uses the authenticated
+        customer's entire saved cart, checks current product eligibility and USD
+        prices, saves immutable price snapshots and reserves all items for up to
+        15 minutes. Missing inventory records are treated as insufficient stock.
+        Cart items remain saved. Payment is initiated in a later stage.
+        Idempotency-Key identifies one order per Customer. Once an order is saved,
+        repeating the same key returns its progress, completed checkout or recorded
+        failure, including after a disconnect or service restart. Use a new key for
+        a deliberate new checkout. Validation failures before order creation are
+        not saved for replay. An absent body and an empty object are equivalent.
+        Changes to the live cart do not change an existing order or its price snapshots.
+        Transient failures are reconciled by a background worker. Stock cleanup
+        applies only to orders that never became ready for payment; payment-aware
+        expiry is handled in a later stage.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Customer-scoped key for one checkout intent; reuse it for retries.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: '^[A-Za-z0-9._:-]{1,128}$'
+          example: checkout-019a6000-0000-7000-8000-000000000001
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              maxProperties: 0
+            example: {}
+      responses:
+        '201':
+          description: Order created with a confirmed stock reservation, or the same completed checkout replayed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+        '202':
+          description: Checkout is processing or awaiting confirmed reservation cleanup. Retry the same request and key to retrieve its outcome.
+          headers:
+            Retry-After:
+              description: Suggested delay in seconds before retrying the same key.
+              schema: {type: integer, const: 5}
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutProgressResponse'
+              example:
+                data:
+                  order_id: 019a6000-0000-7000-8000-000000000002
+                  status: PENDING
+                errors: []
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: FORBIDDEN. Customer permission is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: EMPTY_CART or PRODUCT_UNAVAILABLE before order creation; or a saved INSUFFICIENT_STOCK, RESERVATION_UNAVAILABLE or CHECKOUT_FAILED outcome. Reusing a failed order's key does not create a new order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: SERVICE_UNAVAILABLE. Checkout outcome could not be retrieved within the deadline; retry using the same key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/cart:
     get:
       tags: [Cart]
@@ -275,6 +366,73 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
   schemas:
+    CheckoutProgressResponse:
+      type: object
+      additionalProperties: false
+      required: [data, errors]
+      properties:
+        data:
+          type: object
+          additionalProperties: false
+          required: [order_id, status]
+          properties:
+            order_id: {type: string, format: uuid}
+            status:
+              type: string
+              enum: [PENDING, CLEANUP_PENDING]
+        errors:
+          type: array
+          maxItems: 0
+          items:
+            $ref: '#/components/schemas/ApiError'
+    CheckoutResponse:
+      type: object
+      additionalProperties: false
+      required: [data, errors]
+      properties:
+        data:
+          $ref: '#/components/schemas/CheckoutOrder'
+        errors:
+          type: array
+          maxItems: 0
+          items:
+            $ref: '#/components/schemas/ApiError'
+    CheckoutOrder:
+      type: object
+      additionalProperties: false
+      required: [order_id, status, currency, total_usd, reservation_id, reservation_expires_at, items]
+      properties:
+        order_id: {type: string, format: uuid}
+        status: {type: string, const: AWAITING_PAYMENT}
+        currency: {type: string, const: USD}
+        total_usd:
+          type: string
+          description: Exact USD total calculated from the saved unit price snapshots and quantities.
+          examples: ['1599.98']
+        reservation_id: {type: string, format: uuid}
+        reservation_expires_at: {type: string, format: date-time}
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/OrderItemSnapshot'
+    OrderItemSnapshot:
+      type: object
+      additionalProperties: false
+      required: [product_id, product_name, quantity, unit_price_usd]
+      properties:
+        product_id: {type: string, format: uuid}
+        product_name: {type: string}
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 2147483647
+        unit_price_usd:
+          type: string
+          description: Exact positive USD unit price captured at checkout; unaffected by subsequent catalog changes.
+          examples: ['799.99']
     ViewSavedCartResponse:
       type: object
       additionalProperties: false

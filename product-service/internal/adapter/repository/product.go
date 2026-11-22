@@ -65,3 +65,27 @@ func (r *PostgresProductRepository) Create(ctx context.Context, product domain.P
 	}
 	return created, nil
 }
+
+// FindByIDs reads current prices and status directly from Product's database.
+// Inactive products are included so Order can reject them explicitly.
+func (r *PostgresProductRepository) FindByIDs(ctx context.Context, ids []string) ([]domain.Product, error) {
+	rows, err := r.pool.Query(ctx, `
+ SELECT id, name, active, price_usd::text FROM products
+ WHERE id = ANY($1::uuid[]) ORDER BY id`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("find checkout products: %w", err)
+	}
+	defer rows.Close()
+	products := make([]domain.Product, 0)
+	for rows.Next() {
+		var product domain.Product
+		if err := rows.Scan(&product.ID, &product.Name, &product.Active, &product.PriceUSD); err != nil {
+			return nil, fmt.Errorf("read checkout product: %w", err)
+		}
+		products = append(products, product)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate checkout products: %w", err)
+	}
+	return products, nil
+}

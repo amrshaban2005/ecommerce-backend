@@ -5,6 +5,8 @@ use (
 	./auth-service
 	./cart-service
 	./contracts
+	./inventory-service
+	./order-service
 	./product-service
 	./templates/go-service
 )
