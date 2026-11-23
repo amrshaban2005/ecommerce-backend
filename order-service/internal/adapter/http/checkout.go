@@ -37,6 +37,7 @@ type checkoutResponse struct {
 	ReservationID        string              `json:"reservation_id"`
 	ReservationExpiresAt *time.Time          `json:"reservation_expires_at"`
 	Items                []orderItemResponse `json:"items"`
+	Payment              *paymentResponse    `json:"payment,omitempty"`
 }
 
 type apiError struct {
@@ -74,8 +75,9 @@ func (h *CheckoutHandler) Start(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
-	order, err := h.checkout.Start(ctx, port.CheckoutCommand{CustomerID: r.Header.Get("X-User-ID"), IdempotencyKey: keys[0]})
+	result, err := h.checkout.Start(ctx, port.CheckoutCommand{CustomerID: r.Header.Get("X-User-ID"), IdempotencyKey: keys[0]})
 
+	order := result.Order
 	if order.Status == domain.OrderPending || order.Status == domain.OrderCleanupPending {
 		if err != nil {
 			slog.Warn("checkout queued for recovery", "order_id", order.ID, "error", err, "correlation_id", r.Header.Get("X-Correlation-Id"), "service", "order-service")
@@ -92,6 +94,10 @@ func (h *CheckoutHandler) Start(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", "checkout is temporarily unavailable; retry with the same idempotency key", "")
 		case errors.As(err, &validationError):
 			respondError(w, http.StatusBadRequest, "VALIDATION_ERROR", validationError.Message, validationError.Field)
+		case errors.Is(err, domain.ErrPaymentUnavailable):
+			respondError(w, http.StatusConflict, "PAYMENT_UNAVAILABLE", err.Error(), "")
+		case errors.Is(err, domain.ErrReservationUnavailable):
+			respondError(w, http.StatusConflict, "RESERVATION_UNAVAILABLE", err.Error(), "")
 		case errors.Is(err, domain.ErrEmptyCart):
 			respondError(w, http.StatusConflict, "EMPTY_CART", err.Error(), "")
 		case errors.Is(err, domain.ErrProductUnavailable):
@@ -102,7 +108,7 @@ func (h *CheckoutHandler) Start(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if order.Status == domain.OrderCheckoutFailed {
+	if order.Status == domain.OrderCheckoutFailed || order.Status == domain.OrderExpired {
 		message := "checkout could not be completed"
 		switch order.FailureCode {
 		case "EMPTY_CART":
@@ -111,13 +117,15 @@ func (h *CheckoutHandler) Start(w http.ResponseWriter, r *http.Request) {
 			message = domain.ErrProductUnavailable.Error()
 		case "INSUFFICIENT_STOCK":
 			message = domain.ErrInsufficientStock.Error()
-		case "RESERVATION_UNAVAILABLE":
+		case "PAYMENT_FAILED":
+			message = domain.ErrPaymentUnavailable.Error()
+		case "RESERVATION_EXPIRED", "RESERVATION_UNAVAILABLE":
 			message = domain.ErrReservationUnavailable.Error()
 		}
 		respondError(w, http.StatusConflict, order.FailureCode, message, "")
 		return
 	}
-	if order.Status != domain.OrderAwaitingPayment {
+	if order.Status != domain.OrderAwaitingPayment && order.Status != "PAID" && order.Status != "COMPLETED" {
 		respondError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "checkout returned an invalid outcome", "")
 		return
 	}
@@ -125,11 +133,22 @@ func (h *CheckoutHandler) Start(w http.ResponseWriter, r *http.Request) {
 	for _, item := range order.Items {
 		items = append(items, orderItemResponse{ProductID: item.ProductID, ProductName: item.ProductName, Quantity: item.Quantity, UnitPriceUSD: item.UnitPriceUSD})
 	}
-	respondJSON(w, http.StatusCreated, envelope{
-		Data: checkoutResponse{OrderID: order.ID, Status: order.Status, Currency: order.Currency, TotalUSD: order.TotalUSD,
-			ReservationID: order.ReservationID, ReservationExpiresAt: order.ReservationExpiresAt, Items: items},
-		Errors: []apiError{},
-	})
+	response := checkoutResponse{OrderID: order.ID, Status: order.Status, Currency: order.Currency, TotalUSD: order.TotalUSD,
+		ReservationID: order.ReservationID, ReservationExpiresAt: order.ReservationExpiresAt, Items: items}
+	statusCode := http.StatusCreated
+	if result.Payment != nil {
+		response.Payment = &paymentResponse{PaymentID: result.Payment.PaymentID, Status: result.Payment.Status,
+			URL: result.Payment.PaymentURL, SessionExpiresAt: result.Payment.SessionExpiresAt}
+		if result.Payment.PaymentURL == "" {
+			// Stripe may already report paid while webhook confirmation is pending.
+			statusCode = http.StatusAccepted
+			w.Header().Set("Retry-After", "5")
+		}
+	}
+	if order.Status == "PAID" || order.Status == "COMPLETED" {
+		statusCode = http.StatusOK
+	}
+	respondJSON(w, statusCode, envelope{Data: response, Errors: []apiError{}})
 }
 
 func respondError(w http.ResponseWriter, status int, code, message, field string) {
@@ -146,4 +165,11 @@ func respondJSON(w http.ResponseWriter, status int, value envelope) {
 type checkoutProgressResponse struct {
 	OrderID string `json:"order_id"`
 	Status  string `json:"status"`
+}
+
+type paymentResponse struct {
+	PaymentID        string     `json:"payment_id"`
+	Status           string     `json:"status"`
+	URL              string     `json:"payment_url,omitempty"`
+	SessionExpiresAt *time.Time `json:"session_expires_at,omitempty"`
 }

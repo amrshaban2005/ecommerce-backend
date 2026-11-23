@@ -8,8 +8,10 @@ import (
 
 func (r *PostgresOrderRepository) ListRecovery(ctx context.Context, limit int) ([]string, error) {
 	rows, err := r.pool.Query(ctx, `SELECT id FROM orders
- WHERE status IN ('PENDING', 'CLEANUP_PENDING') AND COALESCE(retry_after, created_at) <= clock_timestamp()
- ORDER BY COALESCE(retry_after, created_at), id LIMIT $1`, limit)
+ WHERE (status IN ('PENDING','CLEANUP_PENDING','PAID') AND COALESCE(retry_after,created_at)<=clock_timestamp())
+ OR (status='AWAITING_PAYMENT' AND (payment_status='FAILED' OR reservation_expires_at<=clock_timestamp())
+ AND (retry_after IS NULL OR retry_after<=clock_timestamp()))
+ ORDER BY COALESCE(retry_after,reservation_expires_at,created_at),id LIMIT $1`, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list unfinished orders: %w", err)
 	}
@@ -34,7 +36,7 @@ func (r *PostgresOrderRepository) RetryCheckout(ctx context.Context, orderID, me
 		message = string(text[:1024])
 	}
 	_, err := r.pool.Exec(ctx, `UPDATE orders SET retry_after = clock_timestamp() + $2::bigint * INTERVAL '1 second',
- last_error = $3, updated_at = clock_timestamp() WHERE id = $1 AND status IN ('PENDING', 'CLEANUP_PENDING')`,
+ last_error = $3, updated_at = clock_timestamp() WHERE id = $1 AND status IN ('PENDING','CLEANUP_PENDING','PAID','AWAITING_PAYMENT')`,
 		orderID, int64(delay/time.Second), message)
 	if err != nil {
 		return fmt.Errorf("schedule order retry: %w", err)

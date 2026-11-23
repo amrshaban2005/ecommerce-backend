@@ -12,6 +12,8 @@ type OrderItem struct {
 }
 
 type Order struct {
+	PaymentID            string
+	PaymentStatus        string
 	IdempotencyKey       string
 	FailureCode          string
 	ID                   string

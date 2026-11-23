@@ -50,3 +50,11 @@ func (s *InventoryService) ReleaseReservation(ctx context.Context, orderID strin
 	}
 	return s.reservations.ReleaseByOrder(ctx, id.String(), orderID)
 }
+
+func (s *InventoryService) FinalizeReservation(ctx context.Context, orderID string) (domain.Reservation, error) {
+	orderID, err := domain.NormalizeOrderID(orderID)
+	if err != nil {
+		return domain.Reservation{}, err
+	}
+	return s.reservations.FinalizeByOrder(ctx, orderID)
+}

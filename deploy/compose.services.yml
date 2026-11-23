@@ -74,6 +74,30 @@ services:
       start_period: 10s
     stop_grace_period: 20s
 
+  payment-service:
+    build:
+      context: ..
+      dockerfile: payment-service/Dockerfile
+    environment:
+      HTTP_PORT: "8086"
+      GRPC_PORT: "9095"
+      POSTGRES_DSN: postgres://payment:payment_local_only@postgres:5432/payment_db?sslmode=disable
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:?Set STRIPE_SECRET_KEY to your Stripe test secret key}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?Set STRIPE_WEBHOOK_SECRET to your Stripe webhook signing secret}
+      RABBITMQ_URL: amqp://ecommerce:rabbitmq_local_only@rabbitmq:5672/
+      STRIPE_TIMEOUT_SECONDS: "5"
+      PAYMENT_SUCCESS_URL: ${PAYMENT_SUCCESS_URL:-http://localhost:3000/checkout/success}
+      PAYMENT_CANCEL_URL: ${PAYMENT_CANCEL_URL:-http://localhost:3000/cart}
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8086/health/readiness"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    stop_grace_period: 20s
+
   order-service:
     build:
       context: ..
@@ -85,6 +109,9 @@ services:
       CART_GRPC_ADDRESS: cart-service:9092
       PRODUCT_GRPC_ADDRESS: product-service:9091
       INVENTORY_GRPC_ADDRESS: inventory-service:9093
+      PAYMENT_GRPC_ADDRESS: payment-service:9095
+      RABBITMQ_URL: amqp://ecommerce:rabbitmq_local_only@rabbitmq:5672/
+      PAYMENT_TIMEOUT_SECONDS: "10"
       RPC_TIMEOUT_SECONDS: "5"
       CHECKOUT_TIMEOUT_SECONDS: "20"
       RECOVERY_INTERVAL_SECONDS: "5"
@@ -95,6 +122,8 @@ services:
       product-service:
         condition: service_healthy
       inventory-service:
+        condition: service_healthy
+      payment-service:
         condition: service_healthy
     networks:
       - backend
@@ -119,6 +148,7 @@ services:
       CART_HTTP_ADDRESS: http://cart-service:8083
       INVENTORY_HTTP_ADDRESS: http://inventory-service:8084
       ORDER_HTTP_ADDRESS: http://order-service:8085
+      PAYMENT_HTTP_ADDRESS: http://payment-service:8086
       AUTH_GRPC_ADDRESS: auth-service:9090
     ports:
       - "127.0.0.1:8080:8080"

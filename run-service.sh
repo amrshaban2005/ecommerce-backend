@@ -69,17 +69,34 @@ case "${1:-}" in
             CART_GRPC_ADDRESS="${CART_GRPC_ADDRESS:-127.0.0.1:9092}" \
             PRODUCT_GRPC_ADDRESS="${PRODUCT_GRPC_ADDRESS:-127.0.0.1:9091}" \
             INVENTORY_GRPC_ADDRESS="${INVENTORY_GRPC_ADDRESS:-127.0.0.1:9093}" \
+            PAYMENT_GRPC_ADDRESS="${PAYMENT_GRPC_ADDRESS:-127.0.0.1:9095}" \
+            RABBITMQ_URL="${RABBITMQ_URL:-amqp://ecommerce:rabbitmq_local_only@127.0.0.1:5672/}" \
+            PAYMENT_TIMEOUT_SECONDS="${PAYMENT_TIMEOUT_SECONDS:-10}" \
             RPC_TIMEOUT_SECONDS="${RPC_TIMEOUT_SECONDS:-5}" \
             CHECKOUT_TIMEOUT_SECONDS="${CHECKOUT_TIMEOUT_SECONDS:-20}" \
             RECOVERY_INTERVAL_SECONDS="${RECOVERY_INTERVAL_SECONDS:-5}" \
             RECOVERY_BATCH_SIZE="${RECOVERY_BATCH_SIZE:-10}" \
             go run ./cmd/order-service
         ;;
+    payment-service)
+        : "${STRIPE_SECRET_KEY:?Export STRIPE_SECRET_KEY with a Stripe sandbox secret key}"
+        : "${STRIPE_WEBHOOK_SECRET:?Export STRIPE_WEBHOOK_SECRET with the Stripe webhook signing secret}"
+        cd "$SERVICE_ROOT/payment-service"
+        exec env \
+            HTTP_PORT="${HTTP_PORT:-8086}" \
+            GRPC_PORT="${GRPC_PORT:-9095}" \
+            POSTGRES_DSN="${POSTGRES_DSN:-postgres://payment:payment_local_only@127.0.0.1:5432/payment_db?sslmode=disable}" \
+            PAYMENT_SUCCESS_URL="${PAYMENT_SUCCESS_URL:-http://localhost:3000/checkout/success}" \
+            PAYMENT_CANCEL_URL="${PAYMENT_CANCEL_URL:-http://localhost:3000/cart}" \
+            STRIPE_TIMEOUT_SECONDS="${STRIPE_TIMEOUT_SECONDS:-5}" \
+            RABBITMQ_URL="${RABBITMQ_URL:-amqp://ecommerce:rabbitmq_local_only@127.0.0.1:5672/}" \
+            go run ./cmd/payment-service
+        ;;
     -h|--help)
-        echo "Usage: $0 {api-gateway|auth-service|product-service|cart-service|inventory-service|order-service}"
+        echo "Usage: $0 {api-gateway|auth-service|product-service|cart-service|inventory-service|order-service|payment-service}"
         ;;
     *)
-        echo "Usage: $0 {api-gateway|auth-service|product-service|cart-service|inventory-service|order-service}" >&2
+        echo "Usage: $0 {api-gateway|auth-service|product-service|cart-service|inventory-service|order-service|payment-service}" >&2
         exit 1
         ;;
 esac

@@ -7,6 +7,7 @@ test:
 	$(MAKE) -C api-gateway test
 	$(MAKE) -C templates/go-service test
 build:
+	$(MAKE) -C payment-service build
 	$(MAKE) -C order-service build
 	$(MAKE) -C inventory-service build
 	$(MAKE) -C cart-service build
@@ -16,6 +17,7 @@ build:
 	$(MAKE) -C api-gateway build
 	$(MAKE) -C templates/go-service build
 vet:
+	$(MAKE) -C payment-service vet
 	$(MAKE) -C order-service vet
 	$(MAKE) -C inventory-service vet
 	$(MAKE) -C cart-service vet

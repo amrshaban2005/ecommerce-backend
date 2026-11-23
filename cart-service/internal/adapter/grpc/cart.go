@@ -41,3 +41,26 @@ func (s *CartServer) GetCustomerCart(ctx context.Context, req *cartv1.GetCustome
 	}
 	return response, nil
 }
+
+func (s *CartServer) RemovePurchasedItems(ctx context.Context, req *cartv1.RemovePurchasedItemsRequest) (*cartv1.RemovePurchasedItemsResponse, error) {
+	items := make([]port.PurchasedItem, 0, len(req.GetItems()))
+	for _, item := range req.GetItems() {
+		items = append(items, port.PurchasedItem{ProductID: item.GetProductId(), Quantity: item.GetQuantity()})
+	}
+	err := s.cart.RemovePurchasedItems(ctx, port.RemovePurchasedCommand{OrderID: req.GetOrderId(), CustomerID: req.GetCustomerId(), Items: items})
+	if err != nil {
+		var invalid *domain.ValidationError
+		switch {
+		case errors.As(err, &invalid):
+			return nil, status.Error(codes.InvalidArgument, invalid.Error())
+		case errors.Is(err, context.Canceled):
+			return nil, status.Error(codes.Canceled, "request canceled")
+		case errors.Is(err, context.DeadlineExceeded):
+			return nil, status.Error(codes.DeadlineExceeded, "cart deadline exceeded")
+		default:
+			slog.Error("remove purchased items failed", "error", err, "service", "cart-service")
+			return nil, status.Error(codes.Unavailable, "cart cleanup unavailable")
+		}
+	}
+	return &cartv1.RemovePurchasedItemsResponse{}, nil
+}

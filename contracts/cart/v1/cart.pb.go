@@ -161,6 +161,102 @@ func (x *GetCustomerCartResponse) GetItems() []*CartItem {
 	return nil
 }
 
+type RemovePurchasedItemsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrderId       string                 `protobuf:"bytes,1,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	CustomerId    string                 `protobuf:"bytes,2,opt,name=customer_id,json=customerId,proto3" json:"customer_id,omitempty"`
+	Items         []*CartItem            `protobuf:"bytes,3,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemovePurchasedItemsRequest) Reset() {
+	*x = RemovePurchasedItemsRequest{}
+	mi := &file_cart_v1_cart_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemovePurchasedItemsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemovePurchasedItemsRequest) ProtoMessage() {}
+
+func (x *RemovePurchasedItemsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_cart_v1_cart_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemovePurchasedItemsRequest.ProtoReflect.Descriptor instead.
+func (*RemovePurchasedItemsRequest) Descriptor() ([]byte, []int) {
+	return file_cart_v1_cart_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *RemovePurchasedItemsRequest) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
+func (x *RemovePurchasedItemsRequest) GetCustomerId() string {
+	if x != nil {
+		return x.CustomerId
+	}
+	return ""
+}
+
+func (x *RemovePurchasedItemsRequest) GetItems() []*CartItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+type RemovePurchasedItemsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemovePurchasedItemsResponse) Reset() {
+	*x = RemovePurchasedItemsResponse{}
+	mi := &file_cart_v1_cart_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemovePurchasedItemsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemovePurchasedItemsResponse) ProtoMessage() {}
+
+func (x *RemovePurchasedItemsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_cart_v1_cart_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemovePurchasedItemsResponse.ProtoReflect.Descriptor instead.
+func (*RemovePurchasedItemsResponse) Descriptor() ([]byte, []int) {
+	return file_cart_v1_cart_proto_rawDescGZIP(), []int{4}
+}
+
 var File_cart_v1_cart_proto protoreflect.FileDescriptor
 
 const file_cart_v1_cart_proto_rawDesc = "" +
@@ -174,8 +270,15 @@ const file_cart_v1_cart_proto_rawDesc = "" +
 	"product_id\x18\x01 \x01(\tR\tproductId\x12\x1a\n" +
 	"\bquantity\x18\x02 \x01(\x05R\bquantity\"B\n" +
 	"\x17GetCustomerCartResponse\x12'\n" +
-	"\x05items\x18\x01 \x03(\v2\x11.cart.v1.CartItemR\x05items2c\n" +
-	"\vCartService\x12T\n" +
+	"\x05items\x18\x01 \x03(\v2\x11.cart.v1.CartItemR\x05items\"\x82\x01\n" +
+	"\x1bRemovePurchasedItemsRequest\x12\x19\n" +
+	"\border_id\x18\x01 \x01(\tR\aorderId\x12\x1f\n" +
+	"\vcustomer_id\x18\x02 \x01(\tR\n" +
+	"customerId\x12'\n" +
+	"\x05items\x18\x03 \x03(\v2\x11.cart.v1.CartItemR\x05items\"\x1e\n" +
+	"\x1cRemovePurchasedItemsResponse2\xc8\x01\n" +
+	"\vCartService\x12c\n" +
+	"\x14RemovePurchasedItems\x12$.cart.v1.RemovePurchasedItemsRequest\x1a%.cart.v1.RemovePurchasedItemsResponse\x12T\n" +
 	"\x0fGetCustomerCart\x12\x1f.cart.v1.GetCustomerCartRequest\x1a .cart.v1.GetCustomerCartResponseB*Z(ecommerce.local/contracts/cart/v1;cartv1b\x06proto3"
 
 var (
@@ -190,21 +293,26 @@ func file_cart_v1_cart_proto_rawDescGZIP() []byte {
 	return file_cart_v1_cart_proto_rawDescData
 }
 
-var file_cart_v1_cart_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_cart_v1_cart_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_cart_v1_cart_proto_goTypes = []any{
-	(*GetCustomerCartRequest)(nil),  // 0: cart.v1.GetCustomerCartRequest
-	(*CartItem)(nil),                // 1: cart.v1.CartItem
-	(*GetCustomerCartResponse)(nil), // 2: cart.v1.GetCustomerCartResponse
+	(*GetCustomerCartRequest)(nil),       // 0: cart.v1.GetCustomerCartRequest
+	(*CartItem)(nil),                     // 1: cart.v1.CartItem
+	(*GetCustomerCartResponse)(nil),      // 2: cart.v1.GetCustomerCartResponse
+	(*RemovePurchasedItemsRequest)(nil),  // 3: cart.v1.RemovePurchasedItemsRequest
+	(*RemovePurchasedItemsResponse)(nil), // 4: cart.v1.RemovePurchasedItemsResponse
 }
 var file_cart_v1_cart_proto_depIdxs = []int32{
 	1, // 0: cart.v1.GetCustomerCartResponse.items:type_name -> cart.v1.CartItem
-	0, // 1: cart.v1.CartService.GetCustomerCart:input_type -> cart.v1.GetCustomerCartRequest
-	2, // 2: cart.v1.CartService.GetCustomerCart:output_type -> cart.v1.GetCustomerCartResponse
-	2, // [2:3] is the sub-list for method output_type
-	1, // [1:2] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1, // 1: cart.v1.RemovePurchasedItemsRequest.items:type_name -> cart.v1.CartItem
+	3, // 2: cart.v1.CartService.RemovePurchasedItems:input_type -> cart.v1.RemovePurchasedItemsRequest
+	0, // 3: cart.v1.CartService.GetCustomerCart:input_type -> cart.v1.GetCustomerCartRequest
+	4, // 4: cart.v1.CartService.RemovePurchasedItems:output_type -> cart.v1.RemovePurchasedItemsResponse
+	2, // 5: cart.v1.CartService.GetCustomerCart:output_type -> cart.v1.GetCustomerCartResponse
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_cart_v1_cart_proto_init() }
@@ -218,7 +326,7 @@ func file_cart_v1_cart_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_cart_v1_cart_proto_rawDesc), len(file_cart_v1_cart_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

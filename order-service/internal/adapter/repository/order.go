@@ -63,10 +63,10 @@ func (r *PostgresOrderRepository) SavePending(ctx context.Context, order domain.
 func (r *PostgresOrderRepository) LoadOrder(ctx context.Context, orderID string) (domain.Order, error) {
 	var order domain.Order
 	err := r.pool.QueryRow(ctx, `SELECT id, customer_id, status, currency, total_usd::text,
- COALESCE(reservation_id::text, ''), reservation_expires_at, COALESCE(idempotency_key, ''), COALESCE(failure_code, '')
+ COALESCE(reservation_id::text, ''), reservation_expires_at, COALESCE(idempotency_key, ''), COALESCE(failure_code, ''), COALESCE(payment_id::text,''), COALESCE(payment_status,'')
  FROM orders WHERE id = $1`, orderID).
 		Scan(&order.ID, &order.CustomerID, &order.Status, &order.Currency, &order.TotalUSD, &order.ReservationID,
-			&order.ReservationExpiresAt, &order.IdempotencyKey, &order.FailureCode)
+			&order.ReservationExpiresAt, &order.IdempotencyKey, &order.FailureCode, &order.PaymentID, &order.PaymentStatus)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Order{}, port.ErrOrderNotFound
 	}
@@ -115,10 +115,22 @@ func (r *PostgresOrderRepository) MarkCleanup(ctx context.Context, orderID, fail
 }
 
 func (r *PostgresOrderRepository) FailCheckout(ctx context.Context, orderID string) (bool, error) {
-	updated, err := r.pool.Exec(ctx, `UPDATE orders SET status = 'CHECKOUT_FAILED', retry_after = NULL,
+	updated, err := r.pool.Exec(ctx, `UPDATE orders SET status = CASE WHEN failure_code='RESERVATION_EXPIRED' THEN 'EXPIRED' ELSE 'CHECKOUT_FAILED' END, retry_after = NULL,
  last_error = NULL, updated_at = clock_timestamp() WHERE id = $1 AND status = 'CLEANUP_PENDING'`, orderID)
 	if err != nil {
 		return false, fmt.Errorf("mark checkout failed: %w", err)
 	}
 	return updated.RowsAffected() == 1, nil
+}
+
+func (r *PostgresOrderRepository) MarkCompleted(ctx context.Context, id string) (bool, error) {
+	updated, err := r.pool.Exec(ctx, `UPDATE orders SET status='COMPLETED',retry_after=NULL,last_error=NULL,updated_at=clock_timestamp()
+ WHERE id=$1 AND status='PAID' AND payment_status='PAID'`, id)
+	return updated.RowsAffected() == 1, err
+}
+func (r *PostgresOrderRepository) MarkExpiryCleanup(ctx context.Context, id, paymentID, code string) (bool, error) {
+	updated, err := r.pool.Exec(ctx, `UPDATE orders SET status='CLEANUP_PENDING',payment_id=$2,payment_status='FAILED',
+ failure_code=$3,retry_after=clock_timestamp(),updated_at=clock_timestamp()
+ WHERE id=$1 AND status='AWAITING_PAYMENT' AND payment_status IS DISTINCT FROM 'PAID' AND (payment_id IS NULL OR payment_id=$2)`, id, paymentID, code)
+	return updated.RowsAffected() == 1, err
 }

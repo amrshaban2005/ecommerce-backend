@@ -1,0 +1,52 @@
+syntax = "proto3";
+package payment.v1;
+option go_package = "ecommerce.local/contracts/payment/v1;paymentv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Internal only. Order supplies saved order amounts and a verified reservation.
+// There is no public payment initiation endpoint: checkout calls PreparePayment.
+service PaymentService {
+ // Reuse the single payment for the order and reject mismatched identity/amount.
+ // Reconcile uncertain outcomes without creating another session; PAID never starts a new session.
+ // Close an unpaid session before releasing stock. PENDING means hold/reconcile.
+ // A missing payment becomes a failed cancellation record, blocking late creation.
+ rpc ClosePayment(PreparePaymentRequest) returns (PaymentSession);
+ rpc PreparePayment(PreparePaymentRequest) returns (PaymentSession);
+ // Reconcile provider state when uncertain; cached PENDING is not proof of failure.
+ rpc GetOrderPayment(GetOrderPaymentRequest) returns (PaymentSession);
+}
+
+message PreparePaymentRequest {
+ string order_id = 1;
+ string customer_id = 2;
+ string reservation_id = 3;
+ google.protobuf.Timestamp reservation_expires_at = 4;
+ // Positive integer USD cents, converted exactly from Order's saved total.
+ // Fractional cents must be rejected, never silently rounded.
+ int64 amount_usd_cents = 5;
+ string currency = 6; // USD only
+}
+
+message GetOrderPaymentRequest { string order_id = 1; }
+
+enum PaymentStatus {
+ PAYMENT_STATUS_UNSPECIFIED = 0;
+ PAYMENT_STATUS_PENDING = 1;
+ PAYMENT_STATUS_PAID = 5;
+ PAYMENT_STATUS_FAILED = 6;
+ reserved 2, 3, 4, 7;
+}
+
+message PaymentSession {
+ string payment_id = 1;
+ string order_id = 2;
+ string customer_id = 3;
+ int64 amount_usd_cents = 4;
+ string currency = 5;
+ PaymentStatus status = 6;
+ // Return a payment URL only when the session is usable and the stock hold valid.
+ string payment_url = 7;
+ // Provider session expiry is separate from reservation_expires_at.
+ google.protobuf.Timestamp session_expires_at = 8;
+}

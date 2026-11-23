@@ -1,6 +1,24 @@
 name: ecommerce-infra
 
 services:
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    ports:
+      - "127.0.0.1:5672:5672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ecommerce
+      RABBITMQ_DEFAULT_PASS: rabbitmq_local_only
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   postgres:
     image: postgres:17-alpine
     ports:
@@ -40,3 +58,4 @@ networks:
 
 volumes:
   postgres-data:
+  rabbitmq-data:

@@ -91,6 +91,9 @@ func (s *CheckoutService) releaseOrder(ctx context.Context, order domain.Order) 
 		return s.orders.LoadOrder(ctx, order.ID)
 	}
 	order.Status = domain.OrderCheckoutFailed
+	if order.FailureCode == "RESERVATION_EXPIRED" {
+		order.Status = domain.OrderExpired
+	}
 	return order, nil
 }
 

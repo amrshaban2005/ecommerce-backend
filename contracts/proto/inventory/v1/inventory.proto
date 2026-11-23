@@ -6,8 +6,10 @@ import "google/protobuf/timestamp.proto";
 // Internal API owned by Inventory. Order coordinates checkout and compensation.
 service InventoryService {
  rpc ReserveStock(ReserveStockRequest) returns (Reservation);
+ // Only Order calls this after verified payment. Repeated calls deduct stock once.
+ rpc FinalizeReservation(FinalizeReservationRequest) returns (Reservation);
  rpc GetReservation(GetReservationRequest) returns (Reservation);
- // For definitively failed checkout only. Payment-aware release is a later stage.
+ // Order must confirm payment is definitively unpaid before release.
  // If the order has no reservation, persist a RELEASED cancellation record so
  // a late ReserveStock cannot create a new hold. Repeating release is safe.
  rpc ReleaseReservation(ReleaseReservationRequest) returns (Reservation);
@@ -20,12 +22,14 @@ message ReserveStockRequest {
  string order_id = 1;
  repeated ReservationItem items = 2;
 }
+message FinalizeReservationRequest { string order_id = 1; }
 message GetReservationRequest { string order_id = 1; }
 message ReleaseReservationRequest { string order_id = 1; }
 enum ReservationStatus {
  RESERVATION_STATUS_UNSPECIFIED = 0;
  RESERVATION_STATUS_ACTIVE = 1;
  RESERVATION_STATUS_RELEASED = 2;
+ RESERVATION_STATUS_FINALIZED = 3;
 }
 message Reservation {
  string reservation_id = 1;

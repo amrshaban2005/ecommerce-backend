@@ -28,6 +28,7 @@ const (
 	ReservationStatus_RESERVATION_STATUS_UNSPECIFIED ReservationStatus = 0
 	ReservationStatus_RESERVATION_STATUS_ACTIVE      ReservationStatus = 1
 	ReservationStatus_RESERVATION_STATUS_RELEASED    ReservationStatus = 2
+	ReservationStatus_RESERVATION_STATUS_FINALIZED   ReservationStatus = 3
 )
 
 // Enum value maps for ReservationStatus.
@@ -36,11 +37,13 @@ var (
 		0: "RESERVATION_STATUS_UNSPECIFIED",
 		1: "RESERVATION_STATUS_ACTIVE",
 		2: "RESERVATION_STATUS_RELEASED",
+		3: "RESERVATION_STATUS_FINALIZED",
 	}
 	ReservationStatus_value = map[string]int32{
 		"RESERVATION_STATUS_UNSPECIFIED": 0,
 		"RESERVATION_STATUS_ACTIVE":      1,
 		"RESERVATION_STATUS_RELEASED":    2,
+		"RESERVATION_STATUS_FINALIZED":   3,
 	}
 )
 
@@ -175,6 +178,50 @@ func (x *ReserveStockRequest) GetItems() []*ReservationItem {
 	return nil
 }
 
+type FinalizeReservationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OrderId       string                 `protobuf:"bytes,1,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FinalizeReservationRequest) Reset() {
+	*x = FinalizeReservationRequest{}
+	mi := &file_inventory_v1_inventory_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FinalizeReservationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FinalizeReservationRequest) ProtoMessage() {}
+
+func (x *FinalizeReservationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_inventory_v1_inventory_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FinalizeReservationRequest.ProtoReflect.Descriptor instead.
+func (*FinalizeReservationRequest) Descriptor() ([]byte, []int) {
+	return file_inventory_v1_inventory_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *FinalizeReservationRequest) GetOrderId() string {
+	if x != nil {
+		return x.OrderId
+	}
+	return ""
+}
+
 type GetReservationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OrderId       string                 `protobuf:"bytes,1,opt,name=order_id,json=orderId,proto3" json:"order_id,omitempty"`
@@ -184,7 +231,7 @@ type GetReservationRequest struct {
 
 func (x *GetReservationRequest) Reset() {
 	*x = GetReservationRequest{}
-	mi := &file_inventory_v1_inventory_proto_msgTypes[2]
+	mi := &file_inventory_v1_inventory_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -196,7 +243,7 @@ func (x *GetReservationRequest) String() string {
 func (*GetReservationRequest) ProtoMessage() {}
 
 func (x *GetReservationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_inventory_v1_inventory_proto_msgTypes[2]
+	mi := &file_inventory_v1_inventory_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -209,7 +256,7 @@ func (x *GetReservationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReservationRequest.ProtoReflect.Descriptor instead.
 func (*GetReservationRequest) Descriptor() ([]byte, []int) {
-	return file_inventory_v1_inventory_proto_rawDescGZIP(), []int{2}
+	return file_inventory_v1_inventory_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetReservationRequest) GetOrderId() string {
@@ -228,7 +275,7 @@ type ReleaseReservationRequest struct {
 
 func (x *ReleaseReservationRequest) Reset() {
 	*x = ReleaseReservationRequest{}
-	mi := &file_inventory_v1_inventory_proto_msgTypes[3]
+	mi := &file_inventory_v1_inventory_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -240,7 +287,7 @@ func (x *ReleaseReservationRequest) String() string {
 func (*ReleaseReservationRequest) ProtoMessage() {}
 
 func (x *ReleaseReservationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_inventory_v1_inventory_proto_msgTypes[3]
+	mi := &file_inventory_v1_inventory_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -253,7 +300,7 @@ func (x *ReleaseReservationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReleaseReservationRequest.ProtoReflect.Descriptor instead.
 func (*ReleaseReservationRequest) Descriptor() ([]byte, []int) {
-	return file_inventory_v1_inventory_proto_rawDescGZIP(), []int{3}
+	return file_inventory_v1_inventory_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ReleaseReservationRequest) GetOrderId() string {
@@ -276,7 +323,7 @@ type Reservation struct {
 
 func (x *Reservation) Reset() {
 	*x = Reservation{}
-	mi := &file_inventory_v1_inventory_proto_msgTypes[4]
+	mi := &file_inventory_v1_inventory_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -288,7 +335,7 @@ func (x *Reservation) String() string {
 func (*Reservation) ProtoMessage() {}
 
 func (x *Reservation) ProtoReflect() protoreflect.Message {
-	mi := &file_inventory_v1_inventory_proto_msgTypes[4]
+	mi := &file_inventory_v1_inventory_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -301,7 +348,7 @@ func (x *Reservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Reservation.ProtoReflect.Descriptor instead.
 func (*Reservation) Descriptor() ([]byte, []int) {
-	return file_inventory_v1_inventory_proto_rawDescGZIP(), []int{4}
+	return file_inventory_v1_inventory_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Reservation) GetReservationId() string {
@@ -350,7 +397,9 @@ const file_inventory_v1_inventory_proto_rawDesc = "" +
 	"\bquantity\x18\x02 \x01(\x05R\bquantity\"e\n" +
 	"\x13ReserveStockRequest\x12\x19\n" +
 	"\border_id\x18\x01 \x01(\tR\aorderId\x123\n" +
-	"\x05items\x18\x02 \x03(\v2\x1d.inventory.v1.ReservationItemR\x05items\"2\n" +
+	"\x05items\x18\x02 \x03(\v2\x1d.inventory.v1.ReservationItemR\x05items\"7\n" +
+	"\x1aFinalizeReservationRequest\x12\x19\n" +
+	"\border_id\x18\x01 \x01(\tR\aorderId\"2\n" +
 	"\x15GetReservationRequest\x12\x19\n" +
 	"\border_id\x18\x01 \x01(\tR\aorderId\"6\n" +
 	"\x19ReleaseReservationRequest\x12\x19\n" +
@@ -361,13 +410,15 @@ const file_inventory_v1_inventory_proto_rawDesc = "" +
 	"\x06status\x18\x03 \x01(\x0e2\x1f.inventory.v1.ReservationStatusR\x06status\x129\n" +
 	"\n" +
 	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x123\n" +
-	"\x05items\x18\x05 \x03(\v2\x1d.inventory.v1.ReservationItemR\x05items*w\n" +
+	"\x05items\x18\x05 \x03(\v2\x1d.inventory.v1.ReservationItemR\x05items*\x99\x01\n" +
 	"\x11ReservationStatus\x12\"\n" +
 	"\x1eRESERVATION_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19RESERVATION_STATUS_ACTIVE\x10\x01\x12\x1f\n" +
-	"\x1bRESERVATION_STATUS_RELEASED\x10\x022\x8c\x02\n" +
+	"\x1bRESERVATION_STATUS_RELEASED\x10\x02\x12 \n" +
+	"\x1cRESERVATION_STATUS_FINALIZED\x10\x032\xe8\x02\n" +
 	"\x10InventoryService\x12L\n" +
-	"\fReserveStock\x12!.inventory.v1.ReserveStockRequest\x1a\x19.inventory.v1.Reservation\x12P\n" +
+	"\fReserveStock\x12!.inventory.v1.ReserveStockRequest\x1a\x19.inventory.v1.Reservation\x12Z\n" +
+	"\x13FinalizeReservation\x12(.inventory.v1.FinalizeReservationRequest\x1a\x19.inventory.v1.Reservation\x12P\n" +
 	"\x0eGetReservation\x12#.inventory.v1.GetReservationRequest\x1a\x19.inventory.v1.Reservation\x12X\n" +
 	"\x12ReleaseReservation\x12'.inventory.v1.ReleaseReservationRequest\x1a\x19.inventory.v1.ReservationB4Z2ecommerce.local/contracts/inventory/v1;inventoryv1b\x06proto3"
 
@@ -384,29 +435,32 @@ func file_inventory_v1_inventory_proto_rawDescGZIP() []byte {
 }
 
 var file_inventory_v1_inventory_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_inventory_v1_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_inventory_v1_inventory_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_inventory_v1_inventory_proto_goTypes = []any{
-	(ReservationStatus)(0),            // 0: inventory.v1.ReservationStatus
-	(*ReservationItem)(nil),           // 1: inventory.v1.ReservationItem
-	(*ReserveStockRequest)(nil),       // 2: inventory.v1.ReserveStockRequest
-	(*GetReservationRequest)(nil),     // 3: inventory.v1.GetReservationRequest
-	(*ReleaseReservationRequest)(nil), // 4: inventory.v1.ReleaseReservationRequest
-	(*Reservation)(nil),               // 5: inventory.v1.Reservation
-	(*timestamppb.Timestamp)(nil),     // 6: google.protobuf.Timestamp
+	(ReservationStatus)(0),             // 0: inventory.v1.ReservationStatus
+	(*ReservationItem)(nil),            // 1: inventory.v1.ReservationItem
+	(*ReserveStockRequest)(nil),        // 2: inventory.v1.ReserveStockRequest
+	(*FinalizeReservationRequest)(nil), // 3: inventory.v1.FinalizeReservationRequest
+	(*GetReservationRequest)(nil),      // 4: inventory.v1.GetReservationRequest
+	(*ReleaseReservationRequest)(nil),  // 5: inventory.v1.ReleaseReservationRequest
+	(*Reservation)(nil),                // 6: inventory.v1.Reservation
+	(*timestamppb.Timestamp)(nil),      // 7: google.protobuf.Timestamp
 }
 var file_inventory_v1_inventory_proto_depIdxs = []int32{
 	1, // 0: inventory.v1.ReserveStockRequest.items:type_name -> inventory.v1.ReservationItem
 	0, // 1: inventory.v1.Reservation.status:type_name -> inventory.v1.ReservationStatus
-	6, // 2: inventory.v1.Reservation.expires_at:type_name -> google.protobuf.Timestamp
+	7, // 2: inventory.v1.Reservation.expires_at:type_name -> google.protobuf.Timestamp
 	1, // 3: inventory.v1.Reservation.items:type_name -> inventory.v1.ReservationItem
 	2, // 4: inventory.v1.InventoryService.ReserveStock:input_type -> inventory.v1.ReserveStockRequest
-	3, // 5: inventory.v1.InventoryService.GetReservation:input_type -> inventory.v1.GetReservationRequest
-	4, // 6: inventory.v1.InventoryService.ReleaseReservation:input_type -> inventory.v1.ReleaseReservationRequest
-	5, // 7: inventory.v1.InventoryService.ReserveStock:output_type -> inventory.v1.Reservation
-	5, // 8: inventory.v1.InventoryService.GetReservation:output_type -> inventory.v1.Reservation
-	5, // 9: inventory.v1.InventoryService.ReleaseReservation:output_type -> inventory.v1.Reservation
-	7, // [7:10] is the sub-list for method output_type
-	4, // [4:7] is the sub-list for method input_type
+	3, // 5: inventory.v1.InventoryService.FinalizeReservation:input_type -> inventory.v1.FinalizeReservationRequest
+	4, // 6: inventory.v1.InventoryService.GetReservation:input_type -> inventory.v1.GetReservationRequest
+	5, // 7: inventory.v1.InventoryService.ReleaseReservation:input_type -> inventory.v1.ReleaseReservationRequest
+	6, // 8: inventory.v1.InventoryService.ReserveStock:output_type -> inventory.v1.Reservation
+	6, // 9: inventory.v1.InventoryService.FinalizeReservation:output_type -> inventory.v1.Reservation
+	6, // 10: inventory.v1.InventoryService.GetReservation:output_type -> inventory.v1.Reservation
+	6, // 11: inventory.v1.InventoryService.ReleaseReservation:output_type -> inventory.v1.Reservation
+	8, // [8:12] is the sub-list for method output_type
+	4, // [4:8] is the sub-list for method input_type
 	4, // [4:4] is the sub-list for extension type_name
 	4, // [4:4] is the sub-list for extension extendee
 	0, // [0:4] is the sub-list for field type_name
@@ -423,7 +477,7 @@ func file_inventory_v1_inventory_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_inventory_v1_inventory_proto_rawDesc), len(file_inventory_v1_inventory_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

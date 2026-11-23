@@ -15,9 +15,16 @@ type CheckoutCommand struct {
 	IdempotencyKey string
 }
 
+// CheckoutResult is the application response; external payment data stays out of
+// the Order domain model and is mapped by the HTTP adapter.
+type CheckoutResult struct {
+	Order   domain.Order
+	Payment *PaymentSession
+}
+
 // HTTP and the recovery worker are inbound adapters to the same order workflow.
 type Checkout interface {
-	Start(context.Context, CheckoutCommand) (domain.Order, error)
+	Start(context.Context, CheckoutCommand) (CheckoutResult, error)
 }
 
 type CheckoutRecovery interface {
@@ -27,9 +34,13 @@ type CheckoutRecovery interface {
 type CheckoutWorkflow interface {
 	Checkout
 	CheckoutRecovery
+	PaymentOutcomeRecorder
 }
 
 type OrderRepository interface {
+	MarkCompleted(context.Context, string) (bool, error)
+	MarkExpiryCleanup(ctx context.Context, orderID, paymentID, failureCode string) (bool, error)
+	RecordPaymentOutcome(context.Context, PaymentOutcomeCommand) (bool, error)
 	FindByKey(ctx context.Context, customerID, key string) (domain.Order, error)
 	SavePending(ctx context.Context, order domain.Order, retryDelay time.Duration) (domain.Order, bool, error)
 	LoadOrder(context.Context, string) (domain.Order, error)

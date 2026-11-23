@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	ReservationActive   = "ACTIVE"
-	ReservationReleased = "RELEASED"
+	ReservationActive    = "ACTIVE"
+	ReservationReleased  = "RELEASED"
+	ReservationFinalized = "FINALIZED"
 )
 
 var (

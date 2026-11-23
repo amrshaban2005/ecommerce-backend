@@ -13,6 +13,8 @@ tags:
     description: Product catalog and administration
   - name: Cart
     description: Saved customer cart
+  - name: Payment
+    description: Stripe sandbox payment confirmation
   - name: Checkout
     description: Checkout and order creation
 paths:
@@ -149,6 +151,60 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /api/v1/webhooks/stripe:
+    post:
+      tags: [Payment]
+      operationId: receiveStripeWebhook
+      summary: Receive verified Stripe sandbox checkout events
+      description: >-
+        Uses the exact raw body and Stripe-Signature header for signature and timestamp
+        verification. Supports checkout.session.completed, checkout.session.expired,
+        checkout.session.async_payment_succeeded and checkout.session.async_payment_failed.
+        Only events for this service's payments are processed; other signed test events
+        are ignored. Stripe session identity, amount and currency are retrieved and
+        checked against the saved payment before recording a result. Duplicate event
+        IDs are harmless. Pending Order notifications are retried in the background.
+        Order asynchronously finalizes reserved inventory and removes purchased
+        quantities after verified payment. The webhook itself does not change stock.
+      security: []
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object}
+      responses:
+        '200':
+          description: Event processed, already processed or ignored; Order notification may still be pending.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, errors]
+                properties:
+                  data:
+                    type: object
+                    required: [received]
+                    properties:
+                      received: {type: boolean, const: true}
+                  errors: {type: array, maxItems: 0, items: {type: object}}
+        '400':
+          description: INVALID_WEBHOOK. Signature, timestamp, payload or sandbox mode is invalid.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+        '413':
+          description: PAYLOAD_TOO_LARGE. Payload exceeds 1 MiB.
+        '503':
+          description: SERVICE_UNAVAILABLE. Event processing failed; retry delivery. Saved events are also retried by the worker.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
+
   /api/v1/checkout:
     post:
       tags: [Checkout]
@@ -159,7 +215,10 @@ paths:
         customer's entire saved cart, checks current product eligibility and USD
         prices, saves immutable price snapshots and reserves all items for up to
         15 minutes. Missing inventory records are treated as insufficient stock.
-        Cart items remain saved. Payment is initiated in a later stage.
+        Cart items remain saved. Once stock is reserved, Order asks Payment to create
+        or reuse a Stripe test-mode card Checkout Session and returns its payment URL.
+        Saved totals must be exactly representable in USD cents between 0.50 and
+        999999.99; fractional cents are rejected without rounding.
         Idempotency-Key identifies one order per Customer. Once an order is saved,
         repeating the same key returns its progress, completed checkout or recorded
         failure, including after a disconnect or service restart. Use a new key for
@@ -168,7 +227,16 @@ paths:
         Changes to the live cart do not change an existing order or its price snapshots.
         Transient failures are reconciled by a background worker. Stock cleanup
         applies only to orders that never became ready for payment; payment-aware
-        expiry is handled in a later stage.
+        expiry is handled in a later stage. The payment URL is returned only while
+        the stock reservation is valid. Stripe session expiry is a separate deadline.
+        Each order has one payment and one Stripe session. Pending/uncertain outcomes
+        remain PENDING; a declined card can be retried in the same usable session.
+        Expired sessions are not replaced. Signature-verified webhooks are deduplicated,
+        and final payment results are reliably sent to Order. Browser redirects never
+        mark an order paid. Paid orders finalize reserved stock once, remove only
+        purchased cart quantities, then become COMPLETED. Unpaid expired checkouts
+        close their Stripe session before stock release; uncertain payment outcomes
+        keep the reservation held for reconciliation.
       security:
         - bearerAuth: []
       parameters:
@@ -193,13 +261,19 @@ paths:
             example: {}
       responses:
         '201':
-          description: Order created with a confirmed stock reservation, or the same completed checkout replayed
+          description: Order awaiting payment with a usable Stripe sandbox payment session and payment URL; repeated keys reuse the saved order and session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+        '200':
+          description: Paid order awaiting asynchronous stock/cart finalization, or a completed order; no additional payment session is created
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CheckoutResponse'
         '202':
-          description: Checkout is processing or awaiting confirmed reservation cleanup. Retry the same request and key to retrieve its outcome.
+          description: Reservation/cleanup is pending, or payment is pending/awaiting Order notification. Retry the same request and key to retrieve its outcome.
           headers:
             Retry-After:
               description: Suggested delay in seconds before retrying the same key.
@@ -207,7 +281,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CheckoutProgressResponse'
+                oneOf:
+                  - $ref: '#/components/schemas/CheckoutProgressResponse'
+                  - $ref: '#/components/schemas/CheckoutResponse'
               example:
                 data:
                   order_id: 019a6000-0000-7000-8000-000000000002
@@ -224,7 +300,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '409':
-          description: EMPTY_CART or PRODUCT_UNAVAILABLE before order creation; or a saved INSUFFICIENT_STOCK, RESERVATION_UNAVAILABLE or CHECKOUT_FAILED outcome. Reusing a failed order's key does not create a new order.
+          description: EMPTY_CART or PRODUCT_UNAVAILABLE before order creation; saved INSUFFICIENT_STOCK, CHECKOUT_FAILED, PAYMENT_FAILED or RESERVATION_EXPIRED; RESERVATION_UNAVAILABLE for an expired/invalid stock hold; or PAYMENT_UNAVAILABLE for an unusable session. Reusing a failed/expired order's key does not create a new order.
           content:
             application/json:
               schema:
@@ -403,20 +479,42 @@ components:
       required: [order_id, status, currency, total_usd, reservation_id, reservation_expires_at, items]
       properties:
         order_id: {type: string, format: uuid}
-        status: {type: string, const: AWAITING_PAYMENT}
+        status:
+          type: string
+          enum: [AWAITING_PAYMENT, PAID, COMPLETED]
+          description: PAID confirms payment; COMPLETED confirms inventory deduction and purchased-quantity cart cleanup.
         currency: {type: string, const: USD}
         total_usd:
           type: string
-          description: Exact USD total calculated from the saved unit price snapshots and quantities.
+          description: Exact whole-cent USD total calculated from saved prices and quantities; card checkout supports 0.50 through 999999.99 USD.
           examples: ['1599.98']
         reservation_id: {type: string, format: uuid}
         reservation_expires_at: {type: string, format: date-time}
+        payment:
+          $ref: '#/components/schemas/CheckoutPayment'
         items:
           type: array
           minItems: 1
           maxItems: 1000
           items:
             $ref: '#/components/schemas/OrderItemSnapshot'
+    CheckoutPayment:
+      type: object
+      additionalProperties: false
+      required: [payment_id, status]
+      properties:
+        payment_id: {type: string, format: uuid}
+        status:
+          type: string
+          enum: [PENDING, PAID, FAILED]
+        payment_url:
+          type: string
+          format: uri
+          description: Hosted Stripe sandbox payment URL; returned only for a usable pending session while stock is still reserved.
+        session_expires_at:
+          type: string
+          format: date-time
+          description: Stripe deadline; the order's earlier reservation_expires_at controls whether checkout returns this URL.
     OrderItemSnapshot:
       type: object
       additionalProperties: false

@@ -143,6 +143,9 @@ func (r *PostgresReservationRepository) ReleaseByOrder(ctx context.Context, rese
 	if err != nil {
 		return domain.Reservation{}, err
 	}
+	if reservation.Status == domain.ReservationFinalized {
+		return domain.Reservation{}, domain.ErrReservationUnavailable
+	}
 	if reservation.Status == domain.ReservationReleased {
 		if err := tx.Commit(ctx); err != nil {
 			return domain.Reservation{}, fmt.Errorf("commit reservation cancellation: %w", err)
@@ -165,5 +168,43 @@ func (r *PostgresReservationRepository) ReleaseByOrder(ctx context.Context, rese
 		return domain.Reservation{}, fmt.Errorf("commit reservation release: %w", err)
 	}
 	reservation.Status = domain.ReservationReleased
+	return reservation, nil
+}
+
+func (r *PostgresReservationRepository) FinalizeByOrder(ctx context.Context, orderID string) (domain.Reservation, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return domain.Reservation{}, err
+	}
+	defer tx.Rollback(ctx)
+	reservation, err := readReservation(ctx, tx, orderID, true)
+	if err != nil {
+		return reservation, err
+	}
+	if reservation.Status == domain.ReservationFinalized {
+		return reservation, nil
+	}
+	if reservation.Status != domain.ReservationActive {
+		return reservation, domain.ErrReservationUnavailable
+	}
+	// A verified paid order may finish after the hold deadline. Expiry alone never
+	// releases stock, so an active reservation can still be finalized safely.
+	for _, item := range reservation.Items {
+		updated, err := tx.Exec(ctx, `UPDATE inventory SET on_hand=on_hand-$2,reserved=reserved-$2
+   WHERE product_id=$1 AND on_hand>=$2 AND reserved>=$2`, item.ProductID, item.Quantity)
+		if err != nil {
+			return reservation, err
+		}
+		if updated.RowsAffected() != 1 {
+			return reservation, fmt.Errorf("reserved stock inconsistent for %s", item.ProductID)
+		}
+	}
+	if _, err := tx.Exec(ctx, `UPDATE reservations SET status='FINALIZED' WHERE id=$1`, reservation.ID); err != nil {
+		return reservation, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return reservation, err
+	}
+	reservation.Status = domain.ReservationFinalized
 	return reservation, nil
 }

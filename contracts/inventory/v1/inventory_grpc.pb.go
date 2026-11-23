@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InventoryService_ReserveStock_FullMethodName       = "/inventory.v1.InventoryService/ReserveStock"
-	InventoryService_GetReservation_FullMethodName     = "/inventory.v1.InventoryService/GetReservation"
-	InventoryService_ReleaseReservation_FullMethodName = "/inventory.v1.InventoryService/ReleaseReservation"
+	InventoryService_ReserveStock_FullMethodName        = "/inventory.v1.InventoryService/ReserveStock"
+	InventoryService_FinalizeReservation_FullMethodName = "/inventory.v1.InventoryService/FinalizeReservation"
+	InventoryService_GetReservation_FullMethodName      = "/inventory.v1.InventoryService/GetReservation"
+	InventoryService_ReleaseReservation_FullMethodName  = "/inventory.v1.InventoryService/ReleaseReservation"
 )
 
 // InventoryServiceClient is the client API for InventoryService service.
@@ -31,8 +32,10 @@ const (
 // Internal API owned by Inventory. Order coordinates checkout and compensation.
 type InventoryServiceClient interface {
 	ReserveStock(ctx context.Context, in *ReserveStockRequest, opts ...grpc.CallOption) (*Reservation, error)
+	// Only Order calls this after verified payment. Repeated calls deduct stock once.
+	FinalizeReservation(ctx context.Context, in *FinalizeReservationRequest, opts ...grpc.CallOption) (*Reservation, error)
 	GetReservation(ctx context.Context, in *GetReservationRequest, opts ...grpc.CallOption) (*Reservation, error)
-	// For definitively failed checkout only. Payment-aware release is a later stage.
+	// Order must confirm payment is definitively unpaid before release.
 	// If the order has no reservation, persist a RELEASED cancellation record so
 	// a late ReserveStock cannot create a new hold. Repeating release is safe.
 	ReleaseReservation(ctx context.Context, in *ReleaseReservationRequest, opts ...grpc.CallOption) (*Reservation, error)
@@ -50,6 +53,16 @@ func (c *inventoryServiceClient) ReserveStock(ctx context.Context, in *ReserveSt
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Reservation)
 	err := c.cc.Invoke(ctx, InventoryService_ReserveStock_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *inventoryServiceClient) FinalizeReservation(ctx context.Context, in *FinalizeReservationRequest, opts ...grpc.CallOption) (*Reservation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Reservation)
+	err := c.cc.Invoke(ctx, InventoryService_FinalizeReservation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +96,10 @@ func (c *inventoryServiceClient) ReleaseReservation(ctx context.Context, in *Rel
 // Internal API owned by Inventory. Order coordinates checkout and compensation.
 type InventoryServiceServer interface {
 	ReserveStock(context.Context, *ReserveStockRequest) (*Reservation, error)
+	// Only Order calls this after verified payment. Repeated calls deduct stock once.
+	FinalizeReservation(context.Context, *FinalizeReservationRequest) (*Reservation, error)
 	GetReservation(context.Context, *GetReservationRequest) (*Reservation, error)
-	// For definitively failed checkout only. Payment-aware release is a later stage.
+	// Order must confirm payment is definitively unpaid before release.
 	// If the order has no reservation, persist a RELEASED cancellation record so
 	// a late ReserveStock cannot create a new hold. Repeating release is safe.
 	ReleaseReservation(context.Context, *ReleaseReservationRequest) (*Reservation, error)
@@ -100,6 +115,9 @@ type UnimplementedInventoryServiceServer struct{}
 
 func (UnimplementedInventoryServiceServer) ReserveStock(context.Context, *ReserveStockRequest) (*Reservation, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReserveStock not implemented")
+}
+func (UnimplementedInventoryServiceServer) FinalizeReservation(context.Context, *FinalizeReservationRequest) (*Reservation, error) {
+	return nil, status.Error(codes.Unimplemented, "method FinalizeReservation not implemented")
 }
 func (UnimplementedInventoryServiceServer) GetReservation(context.Context, *GetReservationRequest) (*Reservation, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetReservation not implemented")
@@ -142,6 +160,24 @@ func _InventoryService_ReserveStock_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(InventoryServiceServer).ReserveStock(ctx, req.(*ReserveStockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InventoryService_FinalizeReservation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinalizeReservationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InventoryServiceServer).FinalizeReservation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InventoryService_FinalizeReservation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InventoryServiceServer).FinalizeReservation(ctx, req.(*FinalizeReservationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -192,6 +228,10 @@ var InventoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReserveStock",
 			Handler:    _InventoryService_ReserveStock_Handler,
+		},
+		{
+			MethodName: "FinalizeReservation",
+			Handler:    _InventoryService_FinalizeReservation_Handler,
 		},
 		{
 			MethodName: "GetReservation",

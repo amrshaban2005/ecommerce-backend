@@ -28,8 +28,16 @@ func (s *CheckoutService) Recover(ctx context.Context, limit int) error {
 			switch order.Status {
 			case domain.OrderPending:
 				_, err = s.reserveOrder(workCtx, order)
+			case domain.OrderPaid:
+				_, err = s.finalizeOrder(workCtx, order)
+			case domain.OrderAwaitingPayment:
+				_, err = s.expireOrder(workCtx, order)
 			case domain.OrderCleanupPending:
-				_, err = s.releaseOrder(workCtx, order)
+				if order.PaymentID != "" {
+					_, err = s.expireOrder(workCtx, order)
+				} else {
+					_, err = s.releaseOrder(workCtx, order)
+				}
 			}
 		}
 		cancel()
@@ -51,7 +59,7 @@ func (s *CheckoutService) scheduleRetry(ctx context.Context, order domain.Order,
 	if readErr == nil {
 		// The update may already have committed before its response was lost, or
 		// another processor may have finished. Return that outcome without undoing it.
-		if current.Status != domain.OrderPending && current.Status != domain.OrderCleanupPending {
+		if current.Status == domain.OrderCompleted || current.Status == domain.OrderExpired || current.Status == domain.OrderCheckoutFailed {
 			return current, nil
 		}
 		order = current

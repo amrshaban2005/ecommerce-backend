@@ -14,6 +14,9 @@ const (
 	OrderAwaitingPayment = "AWAITING_PAYMENT"
 	OrderCheckoutFailed  = "CHECKOUT_FAILED"
 	OrderCleanupPending  = "CLEANUP_PENDING"
+	OrderPaid            = "PAID"
+	OrderCompleted       = "COMPLETED"
+	OrderExpired         = "EXPIRED"
 )
 
 var (

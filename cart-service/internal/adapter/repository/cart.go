@@ -77,3 +77,44 @@ func (r *PostgresCartRepository) ListByCustomer(ctx context.Context, customerID 
 	}
 	return items, nil
 }
+
+func (r *PostgresCartRepository) RemovePurchasedItems(ctx context.Context, cmd port.RemovePurchasedCommand, hash string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	inserted, err := tx.Exec(ctx, `INSERT INTO processed_orders(order_id,customer_id,items_hash) VALUES($1,$2,$3)
+ ON CONFLICT(order_id) DO NOTHING`, cmd.OrderID, cmd.CustomerID, hash)
+	if err != nil {
+		return err
+	}
+	if inserted.RowsAffected() == 0 {
+		var customerID, itemsHash string
+		if err := tx.QueryRow(ctx, `SELECT customer_id,items_hash FROM processed_orders WHERE order_id=$1`, cmd.OrderID).Scan(&customerID, &itemsHash); err != nil {
+			return err
+		}
+		if customerID != cmd.CustomerID || itemsHash != hash {
+			return &domain.ValidationError{Field: "order_id", Message: "purchased items do not match the processed order"}
+		}
+		return nil
+	}
+	var cartID string
+	err = tx.QueryRow(ctx, `SELECT id FROM carts WHERE customer_id=$1 FOR UPDATE`, cmd.CustomerID).Scan(&cartID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	if err == nil {
+		// Cart additions lock this same customer cart row. Remove only purchased
+		// quantities, preserving any excess or unrelated items added by the customer.
+		for _, item := range cmd.Items {
+			if _, err := tx.Exec(ctx, `DELETE FROM cart_items WHERE cart_id=$1 AND product_id=$2 AND quantity<=$3`, cartID, item.ProductID, item.Quantity); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(ctx, `UPDATE cart_items SET quantity=quantity-$3 WHERE cart_id=$1 AND product_id=$2`, cartID, item.ProductID, item.Quantity); err != nil {
+				return err
+			}
+		}
+	}
+	return tx.Commit(ctx)
+}

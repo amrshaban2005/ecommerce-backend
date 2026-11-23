@@ -5,6 +5,8 @@ CREATE TABLE orders (
   CHECK (status IN ('PENDING', 'AWAITING_PAYMENT', 'CHECKOUT_FAILED', 'CLEANUP_PENDING', 'PAID', 'COMPLETED', 'EXPIRED')),
  currency TEXT NOT NULL DEFAULT 'USD' CHECK (currency = 'USD'),
  total_usd NUMERIC NOT NULL CHECK (total_usd > 0 AND total_usd < 'Infinity'::numeric),
+ payment_id UUID UNIQUE,
+ payment_status TEXT CHECK (payment_status IN ('PENDING','PAID','FAILED')),
  reservation_id UUID UNIQUE,
  reservation_expires_at TIMESTAMPTZ,
  idempotency_key TEXT,

@@ -1,0 +1,28 @@
+// Package dbmigrate applies the service Postgres schema via golang-migrate.
+package dbmigrate
+
+import (
+	"fmt"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
+)
+
+func Migrate(databaseURL string) error {
+	source, err := iofs.New(migrationsFS, "migrations")
+	if err != nil {
+		return fmt.Errorf("migration source: %w", err)
+	}
+
+	m, err := migrate.NewWithSourceInstance("iofs", source, databaseURL)
+	if err != nil {
+		return fmt.Errorf("migrate init: %w", err)
+	}
+	defer func() { _, _ = m.Close() }()
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("migrate up: %w", err)
+	}
+	return nil
+}

@@ -67,6 +67,9 @@ func (s *CheckoutService) createOrderFromCart(ctx context.Context, cmd port.Chec
 	if err != nil {
 		return domain.Order{}, false, &port.DependencyError{Service: "Product", Err: err}
 	}
+	if _, err := domain.AmountUSDCents(order.TotalUSD); err != nil {
+		return domain.Order{}, false, err
+	}
 	order.IdempotencyKey = cmd.IdempotencyKey
 	return s.orders.SavePending(ctx, order, s.processingTimeout+5*time.Second)
 }

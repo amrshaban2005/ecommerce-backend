@@ -143,6 +143,8 @@ func decodeReservation(response *inventoryv1.Reservation) (port.Reservation, err
 	switch response.GetStatus() {
 	case inventoryv1.ReservationStatus_RESERVATION_STATUS_ACTIVE:
 		state = "ACTIVE"
+	case inventoryv1.ReservationStatus_RESERVATION_STATUS_FINALIZED:
+		state = "FINALIZED"
 	case inventoryv1.ReservationStatus_RESERVATION_STATUS_RELEASED:
 		state = "RELEASED"
 	default:
@@ -171,4 +173,27 @@ func inventoryError(err error) error {
 	default:
 		return &port.DependencyError{Service: "Inventory", Err: err}
 	}
+}
+
+func (c *CheckoutClient) FinalizeReservation(ctx context.Context, orderID string) (port.Reservation, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	response, err := c.inventory.FinalizeReservation(ctx, &inventoryv1.FinalizeReservationRequest{OrderId: orderID})
+	if err != nil {
+		return port.Reservation{}, inventoryError(err)
+	}
+	return decodeReservation(response)
+}
+func (c *CheckoutClient) RemovePurchasedItems(ctx context.Context, orderID, customerID string, items []port.CartItem) error {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	request := &cartv1.RemovePurchasedItemsRequest{OrderId: orderID, CustomerId: customerID, Items: make([]*cartv1.CartItem, 0, len(items))}
+	for _, item := range items {
+		request.Items = append(request.Items, &cartv1.CartItem{ProductId: item.ProductID, Quantity: item.Quantity})
+	}
+	_, err := c.cart.RemovePurchasedItems(ctx, request)
+	if err != nil {
+		return &port.DependencyError{Service: "Cart", Err: err}
+	}
+	return nil
 }

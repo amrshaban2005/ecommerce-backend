@@ -31,6 +31,11 @@ func (s *InventoryServer) ReserveStock(ctx context.Context, req *inventoryv1.Res
 	return reservationResponse(reservation, err)
 }
 
+func (s *InventoryServer) FinalizeReservation(ctx context.Context, req *inventoryv1.FinalizeReservationRequest) (*inventoryv1.Reservation, error) {
+	reservation, err := s.inventory.FinalizeReservation(ctx, req.GetOrderId())
+	return reservationResponse(reservation, err)
+}
+
 func (s *InventoryServer) GetReservation(ctx context.Context, req *inventoryv1.GetReservationRequest) (*inventoryv1.Reservation, error) {
 	reservation, err := s.inventory.GetReservation(ctx, req.GetOrderId())
 	return reservationResponse(reservation, err)
@@ -65,6 +70,9 @@ func reservationResponse(reservation domain.Reservation, err error) (*inventoryv
 		}
 	}
 	state := inventoryv1.ReservationStatus_RESERVATION_STATUS_ACTIVE
+	if reservation.Status == domain.ReservationFinalized {
+		state = inventoryv1.ReservationStatus_RESERVATION_STATUS_FINALIZED
+	}
 	if reservation.Status == domain.ReservationReleased {
 		state = inventoryv1.ReservationStatus_RESERVATION_STATUS_RELEASED
 	}

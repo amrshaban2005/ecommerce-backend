@@ -1,0 +1,33 @@
+syntax = "proto3";
+package order.v1;
+option go_package = "ecommerce.local/contracts/order/v1;orderv1";
+
+// Internal Payment -> Order notification. Order owns asynchronous inventory
+// finalization, expiry/release and purchased-cart cleanup.
+service OrderService {
+ rpc RecordPaymentOutcome(RecordPaymentOutcomeRequest) returns (RecordPaymentOutcomeResponse);
+}
+
+enum PaymentOutcome {
+ PAYMENT_OUTCOME_UNSPECIFIED = 0;
+ PAYMENT_OUTCOME_PAID = 1;
+ PAYMENT_OUTCOME_FAILED = 2;
+ reserved 3;
+}
+
+message RecordPaymentOutcomeRequest {
+ string order_id = 1;
+ string payment_id = 2;
+ string customer_id = 3;
+ int64 amount_usd_cents = 4;
+ string currency = 5; // USD only; must match Order's saved amount/currency
+ PaymentOutcome outcome = 6;
+ reserved 7;
+
+}
+
+message RecordPaymentOutcomeResponse {
+ // True also acknowledges an already-applied/obsolete outcome. False means the
+ // caller must not record delivery as complete and should reconcile/retry.
+ bool acknowledged = 1;
+}

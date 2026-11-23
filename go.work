@@ -7,6 +7,7 @@ use (
 	./contracts
 	./inventory-service
 	./order-service
+	./payment-service
 	./product-service
 	./templates/go-service
 )

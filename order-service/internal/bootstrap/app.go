@@ -10,8 +10,10 @@ import (
 	"net/http"
 	"time"
 
+	orderv1 "ecommerce.local/contracts/order/v1"
 	grpcadapter "ecommerce.local/order-service/internal/adapter/grpc"
 	httpadapter "ecommerce.local/order-service/internal/adapter/http"
+	"ecommerce.local/order-service/internal/adapter/messaging"
 	"ecommerce.local/order-service/internal/adapter/repository"
 	"ecommerce.local/order-service/internal/adapter/worker"
 	"ecommerce.local/order-service/internal/application"
@@ -26,16 +28,19 @@ import (
 )
 
 type Application struct {
-	Config         *config.Config
-	HTTPServer     *http.Server
-	GRPCServer     *grpc.Server
-	Health         *health.Handler
-	Listener       net.Listener
-	PgPool         *pgxpool.Pool
-	CheckoutClient *grpcadapter.CheckoutClient
-	RecoveryWorker *worker.RecoveryWorker
-	recoveryCancel context.CancelFunc
-	recoveryDone   chan struct{}
+	Config          *config.Config
+	HTTPServer      *http.Server
+	GRPCServer      *grpc.Server
+	Health          *health.Handler
+	Listener        net.Listener
+	PgPool          *pgxpool.Pool
+	CheckoutClient  *grpcadapter.CheckoutClient
+	PaymentClient   *grpcadapter.PaymentClient
+	RecoveryWorker  *worker.RecoveryWorker
+	PaymentConsumer *messaging.PaymentConsumer
+	recoveryCancel  context.CancelFunc
+	recoveryDone    chan struct{}
+	consumerDone    chan struct{}
 }
 
 func New(cfg *config.Config) (*Application, error) {
@@ -61,17 +66,25 @@ func New(cfg *config.Config) (*Application, error) {
 		pgPool.Close()
 		return nil, fmt.Errorf("checkout clients: %w", err)
 	}
+	paymentClient, err := grpcadapter.NewPaymentClient(cfg.PaymentGRPCAddress, time.Duration(cfg.PaymentTimeoutSeconds)*time.Second)
+	if err != nil {
+		_ = clients.Close()
+		pgPool.Close()
+		return nil, fmt.Errorf("payment client: %w", err)
+	}
 	orders := repository.NewPostgresOrderRepository(pgPool)
 	processingTimeout := time.Duration(cfg.CheckoutTimeoutSeconds) * time.Second
-	checkout := application.NewCheckoutService(orders, clients, clients, clients, processingTimeout)
+	checkout := application.NewCheckoutService(orders, clients, clients, clients, paymentClient, processingTimeout)
 	recovery := worker.NewRecoveryWorker(checkout, time.Duration(cfg.RecoveryIntervalSeconds)*time.Second, cfg.RecoveryBatchSize)
 	checkoutHandler := httpadapter.NewCheckoutHandler(checkout, time.Duration(cfg.CheckoutTimeoutSeconds)*time.Second)
 	hh := health.New()
 
 	grpcSrv := grpc.NewServer()
+	orderv1.RegisterOrderServiceServer(grpcSrv, grpcadapter.NewOrderServer(checkout))
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPCPort))
 	if err != nil {
+		_ = paymentClient.Close()
 		_ = clients.Close()
 		pgPool.Close()
 		return nil, fmt.Errorf("grpc listen: %w", err)
@@ -91,14 +104,16 @@ func New(cfg *config.Config) (*Application, error) {
 	}
 
 	return &Application{
-		Config:         cfg,
-		HTTPServer:     httpSrv,
-		GRPCServer:     grpcSrv,
-		Health:         hh,
-		Listener:       listener,
-		PgPool:         pgPool,
-		CheckoutClient: clients,
-		RecoveryWorker: recovery,
+		Config:          cfg,
+		HTTPServer:      httpSrv,
+		GRPCServer:      grpcSrv,
+		Health:          hh,
+		Listener:        listener,
+		PgPool:          pgPool,
+		CheckoutClient:  clients,
+		PaymentClient:   paymentClient,
+		RecoveryWorker:  recovery,
+		PaymentConsumer: messaging.NewPaymentConsumer(cfg.RabbitMQURL, checkout),
 	}, nil
 }
 
@@ -106,6 +121,11 @@ func (a *Application) Run(errCh chan<- error) {
 	recoveryCtx, cancel := context.WithCancel(context.Background())
 	a.recoveryCancel = cancel
 	a.recoveryDone = make(chan struct{})
+	a.consumerDone = make(chan struct{})
+	go func() {
+		defer close(a.consumerDone)
+		a.PaymentConsumer.Run(recoveryCtx)
+	}()
 	go func() {
 		defer close(a.recoveryDone)
 		a.RecoveryWorker.Run(recoveryCtx)
@@ -151,12 +171,24 @@ func (a *Application) Shutdown(ctx context.Context) error {
 			errs = append(errs, fmt.Errorf("checkout recovery shutdown: %w", shutdownCtx.Err()))
 		}
 	}
+	if a.consumerDone != nil {
+		select {
+		case <-a.consumerDone:
+		case <-shutdownCtx.Done():
+			errs = append(errs, fmt.Errorf("payment consumer shutdown: %w", shutdownCtx.Err()))
+		}
+	}
 	if a.PgPool != nil {
 		a.PgPool.Close()
 	}
 	if a.CheckoutClient != nil {
 		if err := a.CheckoutClient.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("close checkout clients: %w", err))
+		}
+	}
+	if a.PaymentClient != nil {
+		if err := a.PaymentClient.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close payment client: %w", err))
 		}
 	}
 	return errors.Join(errs...)

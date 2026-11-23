@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CartService_GetCustomerCart_FullMethodName = "/cart.v1.CartService/GetCustomerCart"
+	CartService_RemovePurchasedItems_FullMethodName = "/cart.v1.CartService/RemovePurchasedItems"
+	CartService_GetCustomerCart_FullMethodName      = "/cart.v1.CartService/GetCustomerCart"
 )
 
 // CartServiceClient is the client API for CartService service.
@@ -28,6 +29,7 @@ const (
 //
 // Internal checkout API. Only trusted services may supply customer identity.
 type CartServiceClient interface {
+	RemovePurchasedItems(ctx context.Context, in *RemovePurchasedItemsRequest, opts ...grpc.CallOption) (*RemovePurchasedItemsResponse, error)
 	GetCustomerCart(ctx context.Context, in *GetCustomerCartRequest, opts ...grpc.CallOption) (*GetCustomerCartResponse, error)
 }
 
@@ -37,6 +39,16 @@ type cartServiceClient struct {
 
 func NewCartServiceClient(cc grpc.ClientConnInterface) CartServiceClient {
 	return &cartServiceClient{cc}
+}
+
+func (c *cartServiceClient) RemovePurchasedItems(ctx context.Context, in *RemovePurchasedItemsRequest, opts ...grpc.CallOption) (*RemovePurchasedItemsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemovePurchasedItemsResponse)
+	err := c.cc.Invoke(ctx, CartService_RemovePurchasedItems_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *cartServiceClient) GetCustomerCart(ctx context.Context, in *GetCustomerCartRequest, opts ...grpc.CallOption) (*GetCustomerCartResponse, error) {
@@ -55,6 +67,7 @@ func (c *cartServiceClient) GetCustomerCart(ctx context.Context, in *GetCustomer
 //
 // Internal checkout API. Only trusted services may supply customer identity.
 type CartServiceServer interface {
+	RemovePurchasedItems(context.Context, *RemovePurchasedItemsRequest) (*RemovePurchasedItemsResponse, error)
 	GetCustomerCart(context.Context, *GetCustomerCartRequest) (*GetCustomerCartResponse, error)
 	mustEmbedUnimplementedCartServiceServer()
 }
@@ -66,6 +79,9 @@ type CartServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedCartServiceServer struct{}
 
+func (UnimplementedCartServiceServer) RemovePurchasedItems(context.Context, *RemovePurchasedItemsRequest) (*RemovePurchasedItemsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemovePurchasedItems not implemented")
+}
 func (UnimplementedCartServiceServer) GetCustomerCart(context.Context, *GetCustomerCartRequest) (*GetCustomerCartResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetCustomerCart not implemented")
 }
@@ -88,6 +104,24 @@ func RegisterCartServiceServer(s grpc.ServiceRegistrar, srv CartServiceServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&CartService_ServiceDesc, srv)
+}
+
+func _CartService_RemovePurchasedItems_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemovePurchasedItemsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CartServiceServer).RemovePurchasedItems(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CartService_RemovePurchasedItems_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CartServiceServer).RemovePurchasedItems(ctx, req.(*RemovePurchasedItemsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _CartService_GetCustomerCart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -115,6 +149,10 @@ var CartService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "cart.v1.CartService",
 	HandlerType: (*CartServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RemovePurchasedItems",
+			Handler:    _CartService_RemovePurchasedItems_Handler,
+		},
 		{
 			MethodName: "GetCustomerCart",
 			Handler:    _CartService_GetCustomerCart_Handler,
