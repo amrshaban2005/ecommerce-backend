@@ -86,8 +86,8 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?Set STRIPE_WEBHOOK_SECRET to your Stripe webhook signing secret}
       RABBITMQ_URL: amqp://ecommerce:rabbitmq_local_only@rabbitmq:5672/
       STRIPE_TIMEOUT_SECONDS: "5"
-      PAYMENT_SUCCESS_URL: ${PAYMENT_SUCCESS_URL:-http://localhost:3000/checkout/success}
-      PAYMENT_CANCEL_URL: ${PAYMENT_CANCEL_URL:-http://localhost:3000/cart}
+      PAYMENT_SUCCESS_URL: ${PAYMENT_SUCCESS_URL:-http://localhost:5173/checkout/success}
+      PAYMENT_CANCEL_URL: ${PAYMENT_CANCEL_URL:-http://localhost:5173/cart}
     networks:
       - backend
     healthcheck:

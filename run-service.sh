@@ -86,8 +86,8 @@ case "${1:-}" in
             HTTP_PORT="${HTTP_PORT:-8086}" \
             GRPC_PORT="${GRPC_PORT:-9095}" \
             POSTGRES_DSN="${POSTGRES_DSN:-postgres://payment:payment_local_only@127.0.0.1:5432/payment_db?sslmode=disable}" \
-            PAYMENT_SUCCESS_URL="${PAYMENT_SUCCESS_URL:-http://localhost:3000/checkout/success}" \
-            PAYMENT_CANCEL_URL="${PAYMENT_CANCEL_URL:-http://localhost:3000/cart}" \
+            PAYMENT_SUCCESS_URL="${PAYMENT_SUCCESS_URL:-http://localhost:5173/checkout/success}" \
+            PAYMENT_CANCEL_URL="${PAYMENT_CANCEL_URL:-http://localhost:5173/cart}" \
             STRIPE_TIMEOUT_SECONDS="${STRIPE_TIMEOUT_SECONDS:-5}" \
             RABBITMQ_URL="${RABBITMQ_URL:-amqp://ecommerce:rabbitmq_local_only@127.0.0.1:5672/}" \
             go run ./cmd/payment-service

@@ -81,8 +81,8 @@ Set `JWT_SECRET` to a random value of at least 32 bytes in the Auth terminal. In
 ```bash
 export STRIPE_SECRET_KEY='sk_test_REPLACE_ME'
 export STRIPE_WEBHOOK_SECRET='whsec_REPLACE_ME'
-export PAYMENT_SUCCESS_URL='http://localhost:3000/checkout/success'
-export PAYMENT_CANCEL_URL='http://localhost:3000/cart'
+export PAYMENT_SUCCESS_URL='http://localhost:5173/checkout/success'
+export PAYMENT_CANCEL_URL='http://localhost:5173/cart'
 ```
 
 Use your frontend's actual browser return URLs. Start each service in a **separate terminal**, with its required variables exported there:
